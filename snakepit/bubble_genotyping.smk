@@ -22,91 +22,90 @@ def get_dir(base,ext='',**kwargs):
         return f'{base_dir}{ext}'.format_map(Default(kwargs))
     return str(PurePath(base_dir.format_map(Default(kwargs))) / ext.format_map(Default(kwargs)))
 
+wildcard_constraints:
+    L = r'\d+'
+
+#include: 'pangenie.smk'
+
 rule all:
     input:
-        get_dir('VG','test.all.L50.vg.gaf')
-
+        get_dir('VG','test.all.L50.vg.gaf',run='TEST'),
+        get_dir('VG','test.all.L50.mg.gaf',run='TEST')
 
 rule merge_minigraph:
     input:
         gfas = (get_dir('SV','{chr}.L{L}.gfa',chr=CHR) for CHR in range(1,30))
     output:
         get_dir('VG','all.L{L}.gfa')
+    threads: 1
+    resources:
+        mem_mb = 5000
     run:
         for i,gfa in enumerate(input.gfas,1):
-            shell("sed -e 's/s\([0-9]\+\)/{i}_\1/g' {gfa} >> {output")
+            shell(f"sed -e 's/s\([0-9]\+\)/{i}_\\1/g' {gfa} >> {output}")
 
-#rule minigraph_sr:
-#    input:
-#        gfa = '',
-#        sr = ''
-#    output:
-#        'gaf'
-#    threads: 24
-#    resources:
-#        mem_mb = 3500
-#    shell:
-#        '''
-#        minigraph -t {threads} -xsr {input.gfa} {input.sr} | awk '$6~/>/||$6~/</ {print $6}' > {output}
-#        '''
-#
-#rule gfatools_noseq:
-#    input:
-#        ''graph
-#    output:
-#        ''noseq
-#    shell:
-#        'gfatools view -S {input} > {output}'
-#
-#rule genotype_gaf:
-#    input:
-#        gfa = ''
-#        gaf = ''
-#    output:
-#        ''
-#    run:
-#        with open(input,'r') as fin:
-#            for line in fin:
-#                splits =  list(zip(*(iter(re.split('>|<',line)[1:]),) * 2))
-#                for hits in splits:
-#                    orientation = hits[0]
-#                    location = hits.split(':')
-#                    code = location[0][1:]
-#                    start = location[1].split('-')[0]
-#                    shell(f"awk '/{code}/&&/{start}/ {print $2}' >> {{output}}")
-
-
+rule gfatools_noseq:
+    input:
+        get_dir('VG','all.L{L}.gfa')
+    output:
+        get_dir('VG','all.L{L}.noseq.gfa')
+    resources:
+        mem_mb = 5000,
+        walltime = '30'
+    shell:
+        'gfatools view -S {input} > {output}'
+ 
+### minigraph
+rule minigraph_sr:
+    input:
+        gfa = get_dir('VG','all.L{L}.gfa'),
+        fastq = lambda wildcards: config['samples'][wildcards.sample]
+    output:
+        gaf = get_dir('VG','{sample}.all.L{L}.mg.gaf')
+    threads: 18
+    resources:
+        mem_mb = 3500
+    shell:
+        '''
+        minigraph -t {threads} -xsr {input.gfa} {input.fastq} | {workflow.basedir}/remap.py --minigraph {input.gfa} > {output.gaf}
+        #awk '$6~/>/||$6~/</ {{print $6}}'
+        '''
 
 ### VG
 rule vg_construct:
     input:
         get_dir('VG','all.L{L}.gfa')
     output:
-        gbz = multiext(get_dir('VG','all.L{L}'),'.giraffe.gbz','.min','.dist','.xg','.gfa')
+        gbz = multiext(get_dir('VG','all.L{L}'),'.giraffe.gbz','.min','.dist','.chopped.xg','.chopped.P_lines')
     params:
-        lambda wildcards, output: PurePath(output[1].with_suffix('')
+        lambda wildcards, output: PurePath(output[1]).with_suffix('')
+    threads: 4
+    resources:
+        mem_mb = 15000,
+        walltime = '24:00'
     shell:
         '''
-        vg autoindex --workflow giraffe --request XG -g {input.gfa} -p {params} -T $TMPDIR
-        vg view -g {output[3]} > {output[4]}
+        singularity exec -B $(pwd):$(pwd) -B $TMPDIR:$TMPDIR /cluster/work/pausch/alex/images/vg_v1.36.0.sif \
+        /bin/bash -c "vg autoindex --workflow giraffe --request XG \
+        -g {input} -t {threads} -p {params} -T $TMPDIR; \
+        vg view -g {output[3]} | awk '/P/' > {output[4]}"
         '''
 
 rule vg_giraffe:
     input:
-        gbz = multiext(get_dir('VG','all.L{L}'),'.giraffe.gbz','.min','.dist'),
+        gbz = multiext(get_dir('VG','all.L{L}'),'.giraffe.gbz','.min','.dist','.chopped.P_lines'),
+        gfa = get_dir('VG','all.L{L}.noseq.gfa'),
         fastq = lambda wildcards: config['samples'][wildcards.sample]
     output:
-        gaf = get_dir('VG','{sample}.all.L{L}.chopped.{caller}.gaf')
+        gaf = get_dir('VG','{sample}.all.L{L}.vg.gaf')
+    threads: 18
+    resources:
+        mem_mb = 3500
     shell:
         '''
-        /bin/bash -c "vg giraffe -t {threads} -Z {input.gbz[0]} -m {input.gbz[1]} -d {input.gbz[2]} -i -f {input.fastq} -o gaf | cut  -f-1,5-12,15- > {output.gaf}"
+        singularity exec -B $(pwd):$(pwd) /cluster/work/pausch/alex/images/vg_v1.36.0.sif \
+        /bin/bash -c "vg giraffe -t {threads} -Z {input.gbz[0]} \
+        -m {input.gbz[1]} -d {input.gbz[2]} -o gaf \
+        -i -f {input.fastq} | {workflow.basedir}/remap.py --vg {input.gfa} {input.gbz[3]} | cut -f-1,5-12,15- > {output.gaf}"
+        #awk '$6 ~ /^[0-9]+$/'
         '''
-
-
-rule reassociate_IDs:
-    input:
-        get_dir('VG','{sample}.all.L{L}.chopped.vg.gaf')
-    output:
-        get_dir('VG','{sample}.all.L{L}.vg.gaf')
-    shell:
-        ''
