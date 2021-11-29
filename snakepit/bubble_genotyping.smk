@@ -25,7 +25,7 @@ def get_dir(base,ext='',**kwargs):
 wildcard_constraints:
     L = r'\d+'
 
-#include: 'pangenie.smk'
+include: 'pangenie.smk'
 
 rule all:
     input:
@@ -62,9 +62,10 @@ rule minigraph_sr:
         fastq = lambda wildcards: config['samples'][wildcards.sample]
     output:
         gaf = get_dir('VG','{sample}.all.L{L}.mg.gaf')
-    threads: 18
+    threads: 12
     resources:
-        mem_mb = 3500
+        mem_mb = 2000,
+        walltime = '2:00'
     shell:
         '''
         minigraph -t {threads} -xsr {input.gfa} {input.fastq} | {workflow.basedir}/remap.py --minigraph {input.gfa} > {output.gaf}
@@ -76,7 +77,7 @@ rule vg_construct:
     input:
         get_dir('VG','all.L{L}.gfa')
     output:
-        gbz = multiext(get_dir('VG','all.L{L}'),'.giraffe.gbz','.min','.dist','.chopped.xg','.chopped.P_lines')
+        gbz = multiext(get_dir('VG','all.L{L}'),'.giraffe.gbz','.min','.dist','.xg','.chopped.P_lines')
     params:
         lambda wildcards, output: PurePath(output[1]).with_suffix('')
     threads: 4
@@ -88,7 +89,17 @@ rule vg_construct:
         singularity exec -B $(pwd):$(pwd) -B $TMPDIR:$TMPDIR /cluster/work/pausch/alex/images/vg_v1.36.0.sif \
         /bin/bash -c "vg autoindex --workflow giraffe --request XG \
         -g {input} -t {threads} -p {params} -T $TMPDIR; \
-        vg view -g {output[3]} | awk '/P/' > {output[4]}"
+        vg view -g {output[3]} | awk '$1=="P"&&$2!~/ARS/' > {output[4]}"
+        '''
+
+rule vg_snarl:
+    input:
+        ''
+    output:
+        ''
+    shell:
+        '''
+        vg snarls -T chr${i}.vg >> all.snarls
         '''
 
 rule vg_giraffe:
@@ -101,11 +112,13 @@ rule vg_giraffe:
     threads: 18
     resources:
         mem_mb = 3500
+    params:
+        lambda wildcards, input: PurePath(input.fastq).parent
     shell:
         '''
-        singularity exec -B $(pwd):$(pwd) /cluster/work/pausch/alex/images/vg_v1.36.0.sif \
+        singularity exec -B $(pwd):$(pwd) -B {params}:{params} /cluster/work/pausch/alex/images/vg_v1.36.0.sif \
         /bin/bash -c "vg giraffe -t {threads} -Z {input.gbz[0]} \
         -m {input.gbz[1]} -d {input.gbz[2]} -o gaf \
-        -i -f {input.fastq} | {workflow.basedir}/remap.py --vg {input.gfa} {input.gbz[3]} | cut -f-1,5-12,15- > {output.gaf}"
+        -i -f {input.fastq}" | {workflow.basedir}/remap.py --vg {input.gfa} {input.gbz[3]} | cut -f-1,5-12,15- > {output.gaf}
         #awk '$6 ~ /^[0-9]+$/'
         '''
