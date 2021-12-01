@@ -34,9 +34,16 @@ include: 'pangenie.smk'
 def capture_logic():
     targets = []
 
-    for sample in config['samples']:
-        targets.append(get_dir('VG',f'{sample}.all.L50.mg.gaf',run='TEST'))
-        targets.append(get_dir('PG',f'{sample}.all.pangenie_phasing.vcf.gz'))
+
+    for caller in ('mg',):#'vg'):
+        targets.append(get_dir('VG',f'annotated.L50.{caller}.df',run='TEST'))
+    targets.append(get_dir('PG','samples.all.pangenie_phasing.vcf'))
+
+    #for sample in config['samples']:
+    #    targets.append(get_dir('VG',f'{sample}.all.L50.mg.gaf',run='TEST'))
+    #    targets.append(get_dir('PG',f'{sample}.all.L50.vg.gaf',run='TEST'))
+    #    targets.append(get_dir('PG',f'{sample}.all.pangenie_phasing.vcf.gz'))
+    
     return targets
 
 rule all:
@@ -83,7 +90,8 @@ rule count_gaf_node_support:
         get_dir('VG','{sample}.all.L{L}.{caller}.node_counts')
     shell:
         '''
-        awk '$6~/[[:digit:]]/ {{split($6,b,/>|</); for (key in b) {{if(b[key]~/[[:digit:]]/) print  b[key] }} }}' {input} | sort -V | uniq -c | sort -k1,1nr > {output}
+        awk '{{split($6,b,/>|</); for (key in b) {{ print  b[key] }} }}' {input} | sort -V | uniq -c | sort -k1,1nr > {output}
+        #awk '$6~/[[:digit:]]/ {{split($6,b,/>|</); for (key in b) {{if(b[key]~/[[:digit:]]/) print  b[key] }} }}' {input} | sort -V | uniq -c | sort -k1,1nr > {output}
         '''
 
 rule annotate_variants:
@@ -126,7 +134,7 @@ rule gfatools_noseq:
 rule minigraph_sr:
     input:
         gfa = get_dir('VG','all.L{L}.gfa'),
-        fastq = get_dir('fastq','{sample}.fastq') #        fastq = lambda wildcards: config['samples'][wildcards.sample]
+        fastq = get_dir('fastq','{sample}.fastq.gz') #        fastq = lambda wildcards: config['samples'][wildcards.sample]
     output:
         gaf = get_dir('VG','{sample}.all.L{L}.mg.gaf')
     threads: 12
@@ -135,8 +143,7 @@ rule minigraph_sr:
         walltime = '2:00'
     shell:
         '''
-        minigraph -t {threads} -xsr {input.gfa} {input.fastq} | {workflow.basedir}/remap.py --minigraph {input.gfa} > {output.gaf}
-        #awk '$6~/>/||$6~/</ {{print $6}}'
+        minigraph -t {threads} -xsr --vc {input.gfa} {input.fastq} > {output.gaf} # | {workflow.basedir}/remap.py --minigraph {input.gfa} > {output.gaf}
         '''
 
 ### VG
@@ -173,7 +180,7 @@ rule vg_giraffe:
     input:
         gbz = multiext(get_dir('VG','all.L{L}'),'.giraffe.gbz','.min','.dist','.chopped.P_lines'),
         gfa = get_dir('VG','all.L{L}.noseq.gfa'),
-        fastq = get_dir('fastq','{sample}.fastq') #lambda wildcards: config['samples'][wildcards.sample]
+        fastq = get_dir('fastq','{sample}.fastq.gz') #lambda wildcards: config['samples'][wildcards.sample]
     output:
         gaf = get_dir('VG','{sample}.all.L{L}.vg.gaf')
     threads: 18
