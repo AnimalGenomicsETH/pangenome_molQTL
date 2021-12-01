@@ -41,7 +41,7 @@ rule pangenie:
         'pigz/2.4'
     shell:
         '''
-        pigz -p {threads} -d {input.fastq} > $TMPDIR/{wildcards.sample}.fastq
+        pigz -p {threads} -c -d {input.fastq} > $TMPDIR/{wildcards.sample}.fastq
         PanGenie -i $TMPDIR/{wildcards.sample}.fastq -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} {params.phasing} -u -o {params.prefix}
         '''
 
