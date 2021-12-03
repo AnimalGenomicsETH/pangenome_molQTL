@@ -34,15 +34,16 @@ rule pangenie:
         phasing = lambda wildcards: '-p' if wildcards.pangenie_mode == 'phasing' else ''
     threads: 8
     resources:
-        mem_mb = 20000,
-        disk_scratch = 80
+        mem_mb = 17500,
+        disk_scratch = 120,
+        walltime = '4:00'
     envmodules:
         'gcc/8.2.0',
         'pigz/2.4'
     shell:
         '''
         pigz -p {threads} -c -d {input.fastq} > $TMPDIR/{wildcards.sample}.fastq
-        PanGenie -i $TMPDIR/{wildcards.sample}.fastq -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} {params.phasing} -u -o {params.prefix}
+        PanGenie -i $TMPDIR/{wildcards.sample}.fastq -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
         '''
 
 rule bgzip_tabix:

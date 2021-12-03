@@ -37,7 +37,7 @@ def capture_logic():
 
     for caller in ('mg',):#'vg'):
         targets.append(get_dir('VG',f'annotated.L50.{caller}.df',run='TEST'))
-    targets.append(get_dir('PG','samples.all.pangenie_phasing.vcf'))
+    targets.append(get_dir('PG','samples.all.pangenie_genotyping.vcf'))
 
     #for sample in config['samples']:
     #    targets.append(get_dir('VG',f'{sample}.all.L50.mg.gaf',run='TEST'))
@@ -79,7 +79,7 @@ rule merge_intersections:
                     for line in fin:
                         parts = line.split(',')
                         _id = parts[-2]
-                        new_id = _id.split('_')
+                        new_id = _id.replace('_INV','').split('_')
                         r_id = new_id[-1]+'_'+new_id[0][1:]
                         fout.write(line.replace(_id,r_id))
 
@@ -90,7 +90,7 @@ rule count_gaf_node_support:
         get_dir('VG','{sample}.all.L{L}.{caller}.node_counts')
     shell:
         '''
-        awk '{{split($6,b,/>|</); for (key in b) {{ print  b[key] }} }}' {input} | sort -V | uniq -c | sort -k1,1nr > {output}
+        awk '{{split($6,b,/>|</); for (key in b) {{ if(b[key]~/[[:digit:]]/) print  b[key] }} }}' {input} | sort -V | uniq -c | sort -k1,1nr > {output}
         #awk '$6~/[[:digit:]]/ {{split($6,b,/>|</); for (key in b) {{if(b[key]~/[[:digit:]]/) print  b[key] }} }}' {input} | sort -V | uniq -c | sort -k1,1nr > {output}
         '''
 
@@ -105,9 +105,10 @@ rule annotate_variants:
         for sample,sample_f in zip(config['samples'],input.counts):
             with open(sample_f,'r') as fin:
                 for line in fin:
+                    print(line)
                     parts = line.rstrip().split()
                     sample_counter[parts[1]][sample] = int(parts[0])
-        
+        print('made it thus far')
         with open(input.df,'r') as fin_df, open(output[0],'w') as fout:
             for i,line in enumerate(fin_df):
                 if i == 0:
@@ -137,10 +138,10 @@ rule minigraph_sr:
         fastq = get_dir('fastq','{sample}.fastq.gz') #        fastq = lambda wildcards: config['samples'][wildcards.sample]
     output:
         gaf = get_dir('VG','{sample}.all.L{L}.mg.gaf')
-    threads: 12
+    threads: 16
     resources:
         mem_mb = 2000,
-        walltime = '2:00'
+        walltime = '4:00'
     shell:
         '''
         minigraph -t {threads} -xsr --vc {input.gfa} {input.fastq} > {output.gaf} # | {workflow.basedir}/remap.py --minigraph {input.gfa} > {output.gaf}
@@ -193,6 +194,6 @@ rule vg_giraffe:
         singularity exec -B $(pwd):$(pwd) -B {params}:{params} /cluster/work/pausch/alex/images/vg_v1.36.0.sif \
         /bin/bash -c "vg giraffe -t {threads} -Z {input.gbz[0]} \
         -m {input.gbz[1]} -d {input.gbz[2]} -o gaf \
-        -i -f {input.fastq}" | {workflow.basedir}/remap.py --vg {input.gfa} {input.gbz[3]} | cut -f-1,5-12,15- > {output.gaf}
+        -i -f {input.fastq}" > {output} #| {workflow.basedir}/remap.py --vg {input.gfa} {input.gbz[3]} | cut -f-1,5-12,15- > {output.gaf}
         #awk '$6 ~ /^[0-9]+$/'
         '''
