@@ -32,11 +32,11 @@ rule pangenie:
     params:
         prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_{wildcards.pangenie_mode}',''),
         phasing = lambda wildcards: '-p' if wildcards.pangenie_mode == 'phasing' else ''
-    threads: 8
+    threads: 12
     resources:
-        mem_mb = 17500,
+        mem_mb = 15000,
         disk_scratch = 120,
-        walltime = '4:00'
+        walltime = '24:00'
     envmodules:
         'gcc/8.2.0',
         'pigz/2.4'
@@ -65,7 +65,10 @@ rule merge_pangenie:
         (get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf.gz',sample=S) for S in config['samples'])
     output:
         get_dir('PG','samples.all.pangenie_{pangenie_mode}.vcf')
+    threads: 6
+    resources:
+        mem_mb = 4000
     shell:
         '''
-        bcftools merge -o {output} {input}
+        bcftools merge --threads {threads} -o {output} {input}
         '''
