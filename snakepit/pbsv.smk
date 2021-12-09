@@ -8,7 +8,7 @@ rule pbmm2_align:
         mem_mb = 3000,
         walltime = '4:00'
     shell:
-        'pbmm2 align {config[reference]} {input.reads} {output} --sort --preset CCS -j {threads}'
+        'pbmm2 align {config[reference]} {input.reads} {output} --sort --preset CCS -j {threads} --sample {wildcards.sample}'
 
 rule pbsv_discover:
     input:
@@ -25,8 +25,9 @@ rule pbsv_call:
         (get_dir('pbsv','{sample}.ARS.svsig.gz',sample=S) for S in config['hifi_samples'])
     output:
         get_dir('pbsv','samples.pbsv.vcf')
-    threads: 24
+    threads: 8
     resources:
-        mem_mb = 4000
+        mem_mb = 3000,
+        walltime = "24:00"
     shell:
         'pbsv call --ccs -j {threads} {config[reference]} {input} {output}'

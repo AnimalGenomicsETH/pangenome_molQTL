@@ -20,6 +20,8 @@ def get_dir(base,ext='',**kwargs):
         base_dir = ''
     elif base == 'fasta':
         base_dir = 'fasta'
+    elif base == 'pbsv':
+        base_dir = 'pbsv'
     else:
         raise Exception('Base not found')
     if ext and ext[0] == '.':
@@ -30,6 +32,7 @@ wildcard_constraints:
     L = r'\d+'
 
 include: 'pangenie.smk'
+include: 'pbsv.smk'
 
 def capture_logic():
     targets = []
