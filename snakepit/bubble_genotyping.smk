@@ -18,8 +18,8 @@ def get_dir(base,ext='',**kwargs):
         base_dir = '/cluster/scratch/alleonard'
     elif base == 'main':
         base_dir = ''
-    elif base == 'fasta':
-        base_dir = 'fasta'
+    elif base == 'concordance':
+        base_dir = 'pangenie_caller_comparison'
     elif base == 'pbsv':
         base_dir = 'pbsv'
     else:
@@ -47,6 +47,8 @@ def capture_logic():
     #    targets.append(get_dir('PG',f'{sample}.all.L50.vg.gaf',run='TEST'))
     #    targets.append(get_dir('PG',f'{sample}.all.pangenie_phasing.vcf.gz'))
     
+    for sample in config['pangenie_comparisons']:
+        targets.append(get_dir('concordance',f'{sample}.genotype_concordance_summary_metrics'))
     return targets
 
 rule all:

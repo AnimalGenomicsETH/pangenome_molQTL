@@ -31,3 +31,16 @@ rule pbsv_call:
         walltime = "24:00"
     shell:
         'pbsv call --ccs -j {threads} {config[reference]} {input} {output}'
+
+rule pbsv_call_sample:
+    input:
+        get_dir('pbsv','{sample}.ARS.svsig.gz')
+    output:
+        get_dir('pbsv','{sample}.pbsv.vcf')
+    threads: 8
+    resources:
+        mem_mb = 5000,
+        walltime = "4:00"
+    shell:
+        'pbsv call --ccs -j {threads} --max-ins-length 100000 {config[reference]} {input} {output}'
+ 

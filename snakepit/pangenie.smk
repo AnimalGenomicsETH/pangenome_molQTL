@@ -72,3 +72,21 @@ rule merge_pangenie:
         '''
         bcftools merge --threads {threads} -o {output} {input}
         '''
+
+rule compare_pangenie:
+    input:
+        pangenie = get_dir('PG','{sample}.all.pangenie_genotyping.vcf.gz')
+    output:
+        get_dir('concordance','{sample}.genotype_concordance_summary_metrics')
+    params:
+        gc_out = lambda wildcards,output: PurePath(output[0]).parent / f'{wildcards.sample}'
+    resources:
+        mem_mb = 15000,
+        walltime = '60'
+    envmodules:
+        'gcc/8.2.0',
+        'picard/2.25.7'
+    shell:
+        '''
+        picard GenotypeConcordance CALL_VCF={input.pangenie} TRUTH_VCF={config[reference_vcf]} CALL_SAMPLE={wildcards.sample} TRUTH_SAMPLE={wildcards.sample} O={params.gc_out}
+        '''
