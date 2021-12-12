@@ -34,9 +34,9 @@ rule pangenie:
         phasing = lambda wildcards: '-p' if wildcards.pangenie_mode == 'phasing' else ''
     threads: 12
     resources:
-        mem_mb = 15000,
+        mem_mb = 12500,
         disk_scratch = 120,
-        walltime = '24:00'
+        walltime = '4:00'
     envmodules:
         'gcc/8.2.0',
         'pigz/2.4'
