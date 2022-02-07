@@ -22,6 +22,8 @@ def get_dir(base,ext='',**kwargs):
         base_dir = 'pangenie_caller_comparison'
     elif base == 'pbsv':
         base_dir = 'pbsv'
+    elif base == 'igv':
+        base_dir = 'IGV'
     else:
         raise Exception('Base not found')
     if ext and ext[0] == '.':
@@ -33,10 +35,14 @@ wildcard_constraints:
 
 include: 'pangenie.smk'
 include: 'pbsv.smk'
+include: 'igv_validate.smk'
+include: 'plink2.smk'
 
 def capture_logic():
     targets = []
-
+    for sample in config['samples']:
+        targets.append(get_dir('igv',f'{sample}.TBX3.ARS.bam'))
+    return targets
 
     for caller in ('mg',):#'vg'):
         targets.append(get_dir('VG',f'annotated.L50.{caller}.df',run='TEST'))
@@ -172,15 +178,15 @@ rule vg_construct:
         vg view -g {output[3]} | awk '$1=="P"&&$2!~/ARS/' > {output[4]}"
         '''
 
-rule vg_snarl:
-    input:
-        ''
-    output:
-        ''
-    shell:
-        '''
-        vg snarls -T chr${i}.vg >> all.snarls
-        '''
+#rule vg_snarl:
+#    input:
+#        ''
+#    output:
+#        ''
+#    shell:
+#        '''
+#        vg snarls -T chr${i}.vg >> all.snarls
+#        '''
 
 rule vg_giraffe:
     input:
