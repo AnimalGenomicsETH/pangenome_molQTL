@@ -13,24 +13,24 @@ rule bcftools_annotate:
         walltime = '30'
     shell:
         '''
-        bcftools annotate --threads {threads} --set-id +'%CHROM\_%POS' -o {output} {input}
+        bcftools annotate --threads {threads} --set-id +'%CHROM\_%POS\_%TYPE' -o {output} {input}
         '''
 
 rule plink_LD:
     input:
         vcf = 'panels/panel.ANNOT.vcf.gz'
     output:
-        'plink.ROIs.ld.txt'
+        'plink.ROIs.ld'
     params:
         mem = lambda wildcards, threads, resources: threads*resources.mem_mb,
         ROIs = ' '.join(config['ROIs']),
-        out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
+        out = lambda wildcards, output: PurePath(output[0]).with_suffix('')
     threads: 6
     resources:
         mem_mb = 5000,
         walltime = '30'
     shell:
         '''
-        plink --vcf {input.vcf} --ld-snps {params.ROIs} --ld-window-kb 1000 --ld-window 99999 --ld-window-r2 0 --threads {threads} --memory {params.mem} --r2 --chr-set 30 --out {params.out}
+        plink --vcf {input.vcf} --ld-snps {params.ROIs} --ld-window-kb 1000 --ld-window 99999 --ld-window-r2 0 --threads {threads} --memory {params.mem} --r2 --chr-set 30 --vcf-half-call h --out {params.out}
         '''
 #plink --vcf test.vcf --ld-snp 17_60436342 --ld-window-kb 1000 --ld-window 99999 --ld-window-r2 0 --out ex --threads 2 --memory 8000 --r2 --chr-set 30

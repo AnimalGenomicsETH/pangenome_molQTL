@@ -36,7 +36,7 @@ rule pangenie:
     resources:
         mem_mb = 12500,
         disk_scratch = 120,
-        walltime = '4:00'
+        walltime = '24:00'
     envmodules:
         'gcc/8.2.0',
         'pigz/2.4'
@@ -44,6 +44,29 @@ rule pangenie:
         '''
         pigz -p {threads} -c -d {input.fastq} > $TMPDIR/{wildcards.sample}.fastq
         PanGenie -i $TMPDIR/{wildcards.sample}.fastq -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
+        '''
+
+rule direct_pangenie:
+    input:
+        fastq = lambda wildcards: get_sample_location(wildcards.sample),
+        reference = config['reference'],
+        vcf = config['panel']
+    output:
+        get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf')
+    params:
+        prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_{wildcards.pangenie_mode}',''),
+        phasing = lambda wildcards: '-p' if wildcards.pangenie_mode == 'phasing' else ''
+    threads: 12
+    resources:
+        mem_mb = 15000,
+        disk_scratch = 150,
+        walltime = '24:00'
+    shell:
+        '''
+        fastp -w {threads} -i {input[0]} -I {input[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication > $TMPDIR/{wildcards.sample}.fastq
+        PanGenie -i $TMPDIR/{wildcards.sample}.fastq -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
+
+
         '''
 
 rule bgzip_tabix:
