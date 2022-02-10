@@ -22,13 +22,27 @@ rule fastp:
         fastp -w {threads} -i {input[0]} -I {input[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | pigz -p {threads} - > {output}
         '''
 
+rule jellyfish_count:
+    input:
+        lambda wildcards: get_sample_location(wildcards.sample),
+        paths = 'pangenie.2772146623768787664.path_segments.fasta'
+    output:
+        temp(get_dir('fastq','{sample}.jf'))
+    threads: 6
+    resources:
+        mem_mb = 8000
+    shell:
+        '''
+        fastp -w {threads} -i {input[0]} -I {input[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | jellyfish count -L 1 -U 10000 -m 31 -s 3000000000 -p 126 -c 7 -C -t {threads} --if {input.paths} -o {output} /dev/fd/0
+        '''
+
 rule pangenie:
     input:
         reference = config['reference'],
         vcf = config['panel'],
         fastq = get_dir('fastq','{sample}.fastq.gz') # '/cluster/scratch/alleonard/{sample}.fastq'#lambda wildcards: config['samples'][wildcards.sample]
     output:
-        get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf')
+        get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf.OLD')
     params:
         prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_{wildcards.pangenie_mode}',''),
         phasing = lambda wildcards: '-p' if wildcards.pangenie_mode == 'phasing' else ''
@@ -46,27 +60,43 @@ rule pangenie:
         PanGenie -i $TMPDIR/{wildcards.sample}.fastq -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
         '''
 
-rule direct_pangenie:
+rule pangenie_cereal:
     input:
-        fastq = lambda wildcards: get_sample_location(wildcards.sample),
         reference = config['reference'],
         vcf = config['panel']
+    output:
+        'pangenie.2772146623768787664.path_segments.fasta' #how to get the hash name?
+    threads: 6
+    resources:
+        mem_mb = 10000
+    shell:
+        '''
+        /cluster/work/pausch/alex/software/Alex-pangenie/build/src/PanGenie -T -i /dev/null -r {input.reference} -v {input.vcf} -t {threads}
+        touch {output}
+        '''
+
+rule direct_pangenie:
+    input:
+        #fastq = lambda wildcards: get_sample_location(wildcards.sample),
+        reference = config['reference'],
+        vcf = config['panel'],
+        #jf = get_dir('fastq','{sample}.jf'),
+        fastq = lambda wildcards: get_sample_location(wildcards.sample),
+        paths = 'pangenie.2772146623768787664.path_segments.fasta'
     output:
         get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf')
     params:
         prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_{wildcards.pangenie_mode}',''),
         phasing = lambda wildcards: '-p' if wildcards.pangenie_mode == 'phasing' else ''
-    threads: 12
+    threads: 6
     resources:
-        mem_mb = 15000,
-        disk_scratch = 150,
+        mem_mb = 25000,
+        disk_scratch = 75,
         walltime = '24:00'
     shell:
         '''
-        fastp -w {threads} -i {input[0]} -I {input[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication > $TMPDIR/{wildcards.sample}.fastq
-        PanGenie -i $TMPDIR/{wildcards.sample}.fastq -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
-
-
+        fastp -w {threads} -i {input.fastq[0]} -I {input.fastq[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | jellyfish count -L 1 -U 10000 -m 31 -s 3000000000 -p 126 -c 7 -C -t {threads} --if {input.paths} -o $TMPDIR/{wildcards.sample}.jf /dev/fd/0
+        /cluster/work/pausch/alex/software/Alex-pangenie/build/src/PanGenie -i $TMPDIR/{wildcards.sample}.jf -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
         '''
 
 rule bgzip_tabix:

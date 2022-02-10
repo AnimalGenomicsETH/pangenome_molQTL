@@ -29,6 +29,8 @@ rule plink_LD:
     resources:
         mem_mb = 5000,
         walltime = '30'
+    envmodules:
+        'plink'
     shell:
         '''
         plink --vcf {input.vcf} --ld-snps {params.ROIs} --ld-window-kb 1000 --ld-window 99999 --ld-window-r2 0 --threads {threads} --memory {params.mem} --r2 --chr-set 30 --vcf-half-call h --out {params.out}
