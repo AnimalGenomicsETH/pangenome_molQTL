@@ -1,11 +1,9 @@
-
-
 def get_sample_location(sample):
     fastqs = []
     for R in (1,2):
         fastqs.append(str(Path(f'/cluster/work/pausch/inputs/fastq/BTA/{sample}_R{R}.fastq.gz').resolve()))
     return fastqs
-    
+
 rule fastp:
     input:
         lambda wildcards: get_sample_location(wildcards.sample)
@@ -77,33 +75,32 @@ rule pangenie_cereal:
 
 rule direct_pangenie:
     input:
-        #fastq = lambda wildcards: get_sample_location(wildcards.sample),
         reference = config['reference'],
         vcf = config['panel'],
-        #jf = get_dir('fastq','{sample}.jf'),
         fastq = lambda wildcards: get_sample_location(wildcards.sample),
         paths = 'pangenie.2772146623768787664.path_segments.fasta'
     output:
-        get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf')
+        get_dir('PG','{sample}.all.pangenie_genotyping.vcf')
+        #temp(multiext(get_dir('PG','{sample}.all.pangenie_'),'genotyping.vcf','histogram.histo'))
     params:
-        prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_{wildcards.pangenie_mode}',''),
-        phasing = lambda wildcards: '-p' if wildcards.pangenie_mode == 'phasing' else ''
+        prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_genotyping','')
+        #phasing = lambda wildcards: '-p' if wildcards.pangenie_mode == 'phasing' else ''
     threads: 6
     resources:
-        mem_mb = 25000,
+        mem_mb = 16000,
         disk_scratch = 75,
         walltime = '24:00'
     shell:
         '''
         fastp -w {threads} -i {input.fastq[0]} -I {input.fastq[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | jellyfish count -L 1 -U 10000 -m 31 -s 3000000000 -p 126 -c 7 -C -t {threads} --if {input.paths} -o $TMPDIR/{wildcards.sample}.jf /dev/fd/0
-        /cluster/work/pausch/alex/software/Alex-pangenie/build/src/PanGenie -i $TMPDIR/{wildcards.sample}.jf -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
+        /cluster/work/pausch/alex/software/Alex-pangenie/build/src/PanGenie -i $TMPDIR/{wildcards.sample}.jf -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
         '''
 
 rule bgzip_tabix:
     input:
         get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf')
     output:
-        multiext(get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf.gz'),'','.tbi')
+        temp(multiext(get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf.gz'),'','.tbi'))
     threads: 2
     resources:
         mem_mb = 4000
@@ -117,7 +114,7 @@ rule merge_pangenie:
     input:
         (get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf.gz',sample=S) for S in config['samples'])
     output:
-        get_dir('PG','samples.all.pangenie_{pangenie_mode}.vcf')
+        get_dir('PG','samples.all.pangenie_{pangenie_mode}.vcf.gz')
     threads: 6
     resources:
         mem_mb = 4000
