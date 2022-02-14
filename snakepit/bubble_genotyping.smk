@@ -40,21 +40,21 @@ include: 'plink2.smk'
 
 def capture_logic():
     targets = []
-    for sample in config['samples']:
-        targets.append(get_dir('igv',f'{sample}.TBX3.ARS.bam'))
-    return targets
+    #for sample in config['samples']:
+    #    targets.append(get_dir('igv',f'{sample}.TBX3.ARS.bam'))
+    #return targets
 
-    for caller in ('mg',):#'vg'):
-        targets.append(get_dir('VG',f'annotated.L50.{caller}.df',run='TEST'))
-    targets.append(get_dir('PG','samples.all.pangenie_genotyping.vcf'))
+    #for caller in ('mg',):#'vg'):
+    #    targets.append(get_dir('VG',f'annotated.L50.{caller}.df',run='TEST'))
+    targets.append(get_dir('PG','samples.all.pangenie_genotyping.vcf.gz'))
 
     #for sample in config['samples']:
     #    targets.append(get_dir('VG',f'{sample}.all.L50.mg.gaf',run='TEST'))
     #    targets.append(get_dir('PG',f'{sample}.all.L50.vg.gaf',run='TEST'))
     #    targets.append(get_dir('PG',f'{sample}.all.pangenie_phasing.vcf.gz'))
     
-    for sample in config['pangenie_comparisons']:
-        targets.append(get_dir('concordance',f'{sample}.genotype_concordance_summary_metrics'))
+    #for sample in config['pangenie_comparisons']:
+    #    targets.append(get_dir('concordance',f'{sample}.genotype_concordance_summary_metrics'))
     return targets
 
 rule all:
