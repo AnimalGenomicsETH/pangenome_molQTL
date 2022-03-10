@@ -59,3 +59,8 @@ rule plink_matrix:
         plink --vcf <(bcftools --threads {threads} view {input.vcf} {params.region}) --r2 square --chr-set 30 --threads {threads} --memory {params.mem} --out {params.out}
         '''
 #plink --vcf test.vcf --ld-snp 17_60436342 --ld-window-kb 1000 --ld-window 99999 --ld-window-r2 0 --out ex --threads 2 --memory 8000 --r2 --chr-set 30
+
+
+
+rule match_CHIP_tags:
+#zgrep -f <(awk '$3=="1_94218322_INDEL"&&$9>0.8&&$7~/SNP/ {split($7,a,"_"); print a[2]}' plink.ROIs.ld) -H  /cluster/work/pausch/naveen/ALLIMPUTE/hd/CHR1/ref_alt.vcf.gz |  awk 'BEGIN{print "0/0\t0/1\t1/1"}{print gsub(/0\/0/,"")"\t"gsub(/1\/0/,"")+gsub(/0\/1/,"")"\t"gsub(/1\/1/,"")}'
