@@ -60,7 +60,35 @@ rule plink_matrix:
         '''
 #plink --vcf test.vcf --ld-snp 17_60436342 --ld-window-kb 1000 --ld-window 99999 --ld-window-r2 0 --out ex --threads 2 --memory 8000 --r2 --chr-set 30
 
+rule bcftools_get_SV:
+    input:
+        'pangenie/samples.annotated.vcf.gz'
+    output:
+        'pangenie/samples.SV.{ILEN}.txt'
+    resources:
+        mem_mb = 4000
+    shell:
+        '''
+        bcftools query -i 'abs(ILEN)>{wildcards.ILEN}' -f'%ID\n' -H {input} | tail -n +2 > {output}
+        '''
 
+
+rule plink_tag:
+    input:
+        vcf = 'pangenie/samples.annotated.vcf.gz',
+        tags = 'pangenie/samples.SV.{ILEN}.txt'
+    output:
+        'pangenie/samples.SV.{ILEN}.tags.list'
+    threads: 8
+    resources:
+        mem_mb = 3000
+    params:
+        mem = lambda wildcards, threads, resources: threads*resources.mem_mb,
+        out = lambda wildcards, output: PurePath(output[0]).with_suffix('')
+    shell:
+        '''
+        plink --vcf {input.vcf} --show-tags {input.tags} --tag-kb 1000 --threads {threads} --memory {params.mem} --chr-set 30 --vcf-half-call h --list-all --out {params.out}
+        '''
 
 rule match_CHIP_tags:
 #zgrep -f <(awk '$3=="1_94218322_INDEL"&&$9>0.8&&$7~/SNP/ {split($7,a,"_"); print a[2]}' plink.ROIs.ld) -H  /cluster/work/pausch/naveen/ALLIMPUTE/hd/CHR1/ref_alt.vcf.gz |  awk 'BEGIN{print "0/0\t0/1\t1/1"}{print gsub(/0\/0/,"")"\t"gsub(/1\/0/,"")+gsub(/0\/1/,"")"\t"gsub(/1\/1/,"")}'
