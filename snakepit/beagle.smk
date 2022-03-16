@@ -44,10 +44,13 @@ rule gcta:
         'test/chip.{chr}.{region}.beagle.vcf.gz'
     output:
         'test/chip.{chr}.{region}.mlma'
+    threads: 4
+    resources:
+        mem_mb = 5000
     shell:
         '''
-        plink2 --vcf {input} --make-bed --out test/{wildcards.chr}.{wildcards.region} --max-alleles 2
-        gcta --mlma --bfile test/{wildcards.chr}.{wildcards.region} --pheno vzr.phen --out {output} --thread-num {threads}
+        plink2 --vcf {input} --make-pgen --out test/{wildcards.chr}.{wildcards.region}
+        gcta --mlma --pfile test/{wildcards.chr}.{wildcards.region} --pheno vzr.phen --out {output} --thread-num {threads}
         
         '''
 
