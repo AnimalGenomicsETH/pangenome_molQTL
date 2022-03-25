@@ -93,7 +93,7 @@ rule direct_pangenie:
     shell:
         '''
         fastp -w {threads} -i {input.fastq[0]} -I {input.fastq[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | jellyfish count -L 1 -U 10000 -m 31 -s 3000000000 -p 126 -c 7 -C -t {threads} --if {input.paths} -o $TMPDIR/{wildcards.sample}.jf /dev/fd/0
-        /cluster/work/pausch/alex/software/Alex-pangenie/build/src/PanGenie -i $TMPDIR/{wildcards.sample}.jf -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
+        /cluster/work/pausch/alex/software/Alex-pangenie/PanGenie-static -i $TMPDIR/{wildcards.sample}.jf -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
         '''
 
 rule bgzip_tabix:
@@ -112,7 +112,8 @@ rule bgzip_tabix:
 
 rule merge_pangenie:
     input:
-        (get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf.gz',sample=S) for S in config['samples'])
+       vcf = (get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf.gz',sample=S) for S in config['samples']),
+       tbi = (get_dir('PG','{sample}.all.pangenie_{pangenie_mode}.vcf.gz.tbi',sample=S) for S in config['samples'])
     output:
         get_dir('PG','samples.all.pangenie_{pangenie_mode}.vcf.gz')
     threads: 6
@@ -120,7 +121,8 @@ rule merge_pangenie:
         mem_mb = 4000
     shell:
         '''
-        bcftools merge --threads {threads} -o {output} {input}
+        bcftools merge --threads {threads} -o {output} {input.vcf}
+        tabix -p vcf {output}
         '''
 
 rule compare_pangenie:
