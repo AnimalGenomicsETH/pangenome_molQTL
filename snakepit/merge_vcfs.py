@@ -123,7 +123,7 @@ class Allele:
 			to reference sequence
 		id: str
 			allele ID
-		"""	
+		"""
 		self._allele = allele
 		self._start = start
 		self._id = id
@@ -198,8 +198,8 @@ class Haplotype:
 
 	def get_alleles(self):
 		return self._alleles
-		
-	
+
+
 
 class Genotype:
 	"""
@@ -294,7 +294,7 @@ def genotypes_from_list(alleles, ploidy):
 class HaplotypeTable:
 	"""
 	Represents columns of Haplotypes.
-	
+
 	Attributes:
 		haplotypes: maps a column index to the alleles along
 			haplotypes of this column
@@ -347,7 +347,7 @@ class HaplotypeTable:
 		# parse allele IDs either from ID column or ID field in info column (ids need to
 		# be separated by a comma
 		ids = fields[2].split(',')
-		
+
 		ids = fields[2].split(',')
 		if id_in_info:
 			info = { i.split('=')[0] : i.split('=')[1] for i in fields[7].split(';') if "=" in i}
@@ -364,7 +364,7 @@ class HaplotypeTable:
 			allele_obj = Allele(allele, fields[0], start, end, id)
 			self.insert_allele_sequence(row_index, allele_obj)
 			total_ids.add(id)
-			
+
 
 		# store the genotype alleles of each sample in HaplotypeTable
 		column_index = 0
@@ -389,7 +389,7 @@ class HaplotypeTable:
 		"""
 
 		written_ids = set([])
-		
+
 		# no variants present, return
 		if self.is_empty():
 			return None, 0
@@ -424,13 +424,17 @@ class HaplotypeTable:
 				if not undefined_allele:
 					hap_to_sequence[hap] = sequence
 					hap_to_id[hap] = ':'.join(id_sequence)
-		
+
 		# construct VCF line representing the merged variant
 		genotypes = ['.'] * len(self._haplotypes)
 		alt_alleles = []
 		ids = []
 		allele_index = 1
 		allele_cluster = {}
+
+
+		for haplotype in hap_to_sequence.keys():
+			similar_enough_allele(hap_to_sequence[haplotype],allele_cluster,max_edit_distance)
 
 		for haplotype in hap_to_sequence.keys():
 			allele = allele_index
@@ -439,27 +443,32 @@ class HaplotypeTable:
 			elif (seq:=similar_enough_allele(hap_to_sequence[haplotype],allele_cluster,max_edit_distance)): # in alt_alleles:
 				#allele = alt_alleles.index(hap_to_sequence[haplotype]) + 1
 				allele = seq
+				if hap_to_sequence[haplotype] == allele_cluster[seq-1][0]:
+					ids.append(hap_to_id[haplotype])
+					for id in hap_to_id[haplotype].split(':'):
+						written_ids.add(id)
 				#if not hap_to_id[haplotype] in ids:
 				if False and not seq in ids:
 					sys.stderr.write('Different allele combinations lead to same sequence at ' + self._chrom + ':' + str(self._start) + '.\n')
 			else:
 				allele = allele_index
-				allele_cluster[len(allele_cluster)] = [hap_to_sequence[haplotype]]
+
 				alt_alleles.append(hap_to_sequence[haplotype])
 				ids.append(hap_to_id[haplotype])
 				for id in hap_to_id[haplotype].split(':'):
-					written_ids.add(id)			
+					written_ids.add(id)
 				allele_index += 1
 
 			for col in hap_to_column[haplotype]:
 				genotypes[col] = allele
-		
+
+		alt_alleles = [ALTS[0] for ALTS in allele_cluster.values()]
 		# check if no alternative sequences left (e.g. because all haplotypes contained unknown alleles)
 		if len(alt_alleles) == 0:
 			assert not written_ids
 			return None, 0
 		vcf_alt = ','.join(alt_alleles)
-		
+
 		# check if there are any alleles with N characters
 		if any(c not in 'CAGTcagt,' for c in ref_allele) or any(c not in 'CAGTcagt,' for c in vcf_alt):
 			return None, 0
@@ -472,7 +481,7 @@ class HaplotypeTable:
 				','.join(alt_alleles), # ALT
 				'.', # QUAL
 				'PASS', # FILTER
-				'ID=' + ','.join(ids), # INFO 
+				'ID=' + ','.join(ids), # INFO
 				'GT', # FORMAT
 				'\t'.join([str(g) for g in vcf_genotypes]) # sample columns
 			]
@@ -480,16 +489,33 @@ class HaplotypeTable:
 
 import editdistance
 def similar_enough_allele(new_allele,existing_alleles,similarity_threshold=0.01):
+	collapse_IDs = set()
+
 	#Need to consider strange triangle relationships where A~B and B~C but C!~A, and so is a different cluster
 	for ID in existing_alleles:
 		for allele in existing_alleles[ID]:
+			if allele == new_allele:
+				return ID+1
 			#print('comparing',new_allele,allele,editdistance.eval(new_allele, allele), (min(len(allele),len(new_allele)) * similarity_threshold))
 			if editdistance.eval(new_allele, allele) < (min(len(allele),len(new_allele)) * similarity_threshold):
 				#print(f'adding, returning {ID=}')
-				existing_alleles[ID].append(new_allele)
-				return ID+1
+
+				collapse_IDs.add(ID)
+				#existing_alleles[ID].append(new_allele)
+				#return ID+1
+	if collapse_IDs:
+		collapse_IDs = sorted(collapse_IDs)
+		#print(collapse_IDs,existing_alleles)
+		for ID in range(len(collapse_IDs)-1,0,-1):
+			existing_alleles[collapse_IDs[ID-1]].extend(existing_alleles.pop(collapse_IDs[ID]))
+		existing_alleles[collapse_IDs[0]].append(new_allele)
+
+		return collapse_IDs[0]+1
+	else:
+		existing_alleles[len(existing_alleles)] = [new_allele]
 	#print(f'new allele: {new_allele}')
-	return False 
+
+	return False
 
 def parse_line(samples, line, id_in_info=False):
 	variants = []
@@ -511,7 +537,7 @@ def parse_line(samples, line, id_in_info=False):
 			raise Exception('Line: ' + line + ' contains an unphased genotype.')
 		variants.append(Variant([s], start, ref_allele, alt_alleles, [genotype], genotype.get_ploidy(), ids))
 	return chrom, variants
-		
+
 
 def combine_haplotypes(variants):
 	alleles = []
@@ -533,9 +559,9 @@ def print_header(samples):
 def run_merge(reference, vcf, ploidy, chromosomes=None,max_edit_distance=0.0):
 	"""
 	Runs variant merging.
-	
+
 	Parameters:
-	
+
 	reference: str
 		name of the reference FASTA file.
 	vcf: str
@@ -594,7 +620,7 @@ def run_merge(reference, vcf, ploidy, chromosomes=None,max_edit_distance=0.0):
 		if vcf_line is not None:
 			print(vcf_line)
 		total_written += written
-	
+
 	# print statistics
 	sys.stderr.write('Total number of input alleles: ' + str(total_input) + '\n')
 	sys.stderr.write('Total number of written alleles: ' + str(total_written) + '\n')
@@ -603,16 +629,16 @@ def run_merge(reference, vcf, ploidy, chromosomes=None,max_edit_distance=0.0):
 def run_combine_columns(vcf, samples):
 	"""
 	Combines columns beloning to the same sample.
-	
+
 	Parameters:
-	
+
 	vcf: str
 		name of the input VCF file
 	samples: str
 		file specifying which columns of the VCF
 		belong to the same sample and shall be
 		combined
-	
+
 	"""
 
 	sample_to_haplotype = defaultdict(list)
@@ -631,7 +657,7 @@ def run_combine_columns(vcf, samples):
 				for index,c in enumerate(columns):
 					column_to_index[c] = index
 				samples = [s for s in sample_to_haplotype.keys()]
-				print('\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT'] + samples))	
+				print('\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT'] + samples))
 				continue
 			vcf_samples = []
 			for s,v in sample_to_haplotype.items():
@@ -658,7 +684,7 @@ if __name__ == '__main__':
 
 	parser_combine = subparsers.add_parser('combine_columns', help='combine single haplotype columns into diploid genotype columns.')
 	parser_combine.add_argument('-vcf', metavar='VCF', required=True, help='VCF-file with one column per haplotype.' )
-	parser_combine.add_argument('-samples', metavar='SAMPLES', help='file containing one line per sample to be merged (sample_name,h0,h1)', required=True)	
+	parser_combine.add_argument('-samples', metavar='SAMPLES', help='file containing one line per sample to be merged (sample_name,h0,h1)', required=True)
 	args = parser.parse_args()
 
 	if args.subparser_name == 'merge':
