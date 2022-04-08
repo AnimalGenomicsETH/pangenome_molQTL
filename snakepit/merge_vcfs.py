@@ -434,6 +434,8 @@ class HaplotypeTable:
 
 
 		for haplotype in hap_to_sequence.keys():
+			if haplotype.is_reference():
+				continue
 			similar_enough_allele(hap_to_sequence[haplotype],allele_cluster,max_edit_distance)
 
 		for haplotype in hap_to_sequence.keys():
