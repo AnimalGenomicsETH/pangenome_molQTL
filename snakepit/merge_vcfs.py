@@ -437,8 +437,8 @@ class HaplotypeTable:
 			if haplotype.is_reference():
 				continue
 			similar_enough_allele(hap_to_sequence[haplotype],allele_cluster,max_edit_distance)
-			allele_cluster = simplify_allele_IDs(allele_cluster)	
-	
+			allele_cluster = simplify_allele_IDs(allele_cluster)
+		
 		for haplotype in hap_to_sequence.keys():
 			allele = allele_index
 			if haplotype.is_reference():
@@ -446,7 +446,7 @@ class HaplotypeTable:
 			elif (seq:=similar_enough_allele(hap_to_sequence[haplotype],allele_cluster,max_edit_distance)): # in alt_alleles:
 				#allele = alt_alleles.index(hap_to_sequence[haplotype]) + 1
 				allele = seq
-				if hap_to_sequence[haplotype] == allele_cluster[seq-1][0]:
+				if hap_to_sequence[haplotype] == allele_cluster[allele-1][0]:
 					ids.append(hap_to_id[haplotype])
 					for id in hap_to_id[haplotype].split(':'):
 						written_ids.add(id)
@@ -475,7 +475,6 @@ class HaplotypeTable:
 		# check if there are any alleles with N characters
 		if any(c not in 'CAGTcagt,' for c in ref_allele) or any(c not in 'CAGTcagt,' for c in vcf_alt):
 			return None, 0
-
 		vcf_genotypes = genotypes_from_list(genotypes, self._ploidy)
 		vcf_line = [	self._chrom, # CHROM
 				str(self._start), # POS
@@ -513,22 +512,17 @@ def similar_enough_allele(new_allele,existing_alleles,similarity_threshold=0.01)
 				#existing_alleles[ID].append(new_allele)
 				#return ID+1
 	#temp_alleles = {}
-	if len(collapse_IDs) > 1:
+	if collapse_IDs:
 		collapse_IDs = sorted(collapse_IDs)
 		for ID in range(len(collapse_IDs)-1,0,-1):
 			existing_alleles[collapse_IDs[ID-1]].extend(existing_alleles.pop(collapse_IDs[ID]))
 		existing_alleles[collapse_IDs[0]].append(new_allele)
-		#for index,ID in enumerate(existing_alleles.keys()):
-		#	temp_alleles[index] = existing_alleles[ID]
 		#print(temp_alleles)
-		#existing_alleles = temp_alleles
 		#print("ALLELE table on exit",existing_alleles)
 		return collapse_IDs[0]+1
-	elif len(collapse_IDs) == 1:
-		return collapse_IDs.pop()+1
-	else:
+	else:	
 		existing_alleles[len(existing_alleles)] = [new_allele]
-		#print(f'new allele: {new_allele}')
+		#print(f'Added {new_allele=}')
 
 	return False
 
