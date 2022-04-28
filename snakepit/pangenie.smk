@@ -1,7 +1,7 @@
 def get_sample_location(sample):
     fastqs = []
     for R in (1,2):
-        fastqs.append(str(Path(f'/cluster/work/pausch/inputs/fastq/BTA/{sample}_R{R}.fastq.gz').resolve()))
+        fastqs.append(str(Path(f'{config["fastq"]}{sample}_R{R}.fastq.gz').resolve()))
     return fastqs
 
 rule fastp:
@@ -69,7 +69,7 @@ rule pangenie_cereal:
         mem_mb = 10000
     shell:
         '''
-        /cluster/work/pausch/alex/software/Alex-pangenie/build/src/PanGenie -T -i /dev/null -r {input.reference} -v {input.vcf} -t {threads}
+        /cluster/work/pausch/alex/software/Alex-pangenie/build/src/PanGenie -B -i /dev/null -r {input.reference} -v {input.vcf} -t {threads}
         touch {output}
         '''
 
@@ -78,22 +78,22 @@ rule direct_pangenie:
         reference = config['reference'],
         vcf = config['panel'],
         fastq = lambda wildcards: get_sample_location(wildcards.sample),
-        paths = 'pangenie.2772146623768787664.path_segments.fasta'
+        paths = 'pangenie.11499423960070264872.path_segments.fasta'
     output:
         get_dir('PG','{sample}.all.pangenie_genotyping.vcf')
         #temp(multiext(get_dir('PG','{sample}.all.pangenie_'),'genotyping.vcf','histogram.histo'))
     params:
         prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_genotyping','')
         #phasing = lambda wildcards: '-p' if wildcards.pangenie_mode == 'phasing' else ''
-    threads: 6
+    threads: 8
     resources:
-        mem_mb = 16000,
+        mem_mb = 13000,
         disk_scratch = 75,
-        walltime = '24:00'
+        walltime = '4:00'
     shell:
         '''
         fastp -w {threads} -i {input.fastq[0]} -I {input.fastq[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | jellyfish count -L 1 -U 10000 -m 31 -s 3000000000 -p 126 -c 7 -C -t {threads} --if {input.paths} -o $TMPDIR/{wildcards.sample}.jf /dev/fd/0
-        /cluster/work/pausch/alex/software/Alex-pangenie/PanGenie-static -i $TMPDIR/{wildcards.sample}.jf -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
+        /cluster/work/pausch/alex/software/Alex-pangenie/build/src/PanGenie -i $TMPDIR/{wildcards.sample}.jf -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
         '''
 
 rule bgzip_tabix:
