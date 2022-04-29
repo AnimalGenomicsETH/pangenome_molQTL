@@ -302,16 +302,16 @@ rule merge_haplotypes:
         vcf = outdir + "multisample-vcfs/callset-filtered.vcf",
         reference = config['reference']
     output:
-        tmp = temp(outdir + "multisample-vcfs/graph-filtered-tmp.vcf")
-    params:
-        chrom = ','.join([c for c in chromosomes])
+        tmp = temp(outdir + "multisample-vcfs/graph-filtered-tmp-{chr}.vcf")
+    #params:
+    #    chrom = ','.join([c for c in chromosomes])
     threads: 1
     resources:
-        mem_mb=20000,
-        walltime = '24:00'
+        mem_mb=5000,
+        walltime = '4:00'
     shell:
         """
-        python3 {mscripts}/merge_vcfs.py merge -vcf {input.vcf} -r {input.reference} -ploidy 2 -chromosomes {params.chrom} -max_edit_distance 0.01 > {output.tmp}
+        python3 {mscripts}/merge_vcfs.py merge -vcf {input.vcf} -r {input.reference} -ploidy 2 -chromosomes {wildcards.chr} -max_edit_distance 0.01 > {output.tmp}
         """
 
 #############################################
@@ -320,7 +320,7 @@ rule merge_haplotypes:
 
 rule normalize_vcf:
     input:
-        vcf = outdir + "multisample-vcfs/graph-filtered-tmp.vcf.gz",
+        vcfs = expand(outdir + "multisample-vcfs/graph-filtered-tmp-{chr}.vcf.gz",chr=chromosomes),
         reference = config['reference']
     output:
         outdir + "multisample-vcfs/graph-filtered.vcf"
@@ -328,7 +328,7 @@ rule normalize_vcf:
     resources:
         mem_mb = 5000
     shell:
-        "bcftools norm --threads {threads} -d all -f {input.reference} {input.vcf} > {output}"
+        "bcftools concat --threads {threads} -Ou {input.vcfs} | bcftools norm --threads {threads} -d all -f {input.reference} - > {output}"
 
 
 rule vcfstats_statistics:
