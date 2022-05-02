@@ -55,6 +55,21 @@ rule gcta:
         '''
 
 
+
+rule qtltools_parallel:
+    input:
+        ''
+    output:
+        'X'
+    shell:
+        '''
+        parallel --ungroup --jobs {threads} "QTLtools cis --silent --vcf {input.vcf} --bed {input.bed} --cov {input.cov} --permute 100 --chunk {{}} config[chunks] --out {outputpermutations_$j\_20.txt ::: {1..100}
+        cat {output.permutations} > {output.nomimal}
+        '''
+#/cluster/work/pausch/alex/XENA/qtltools/bin/QTLtools gwas --bed aligned_genes.bed.gz --vcf imputed_chip_unique.vcf.gz --cov /cluster/work/pausch/xena/eQTL/covariates.txt --normal --out gwas_results.txt
+#sed -e '/60436342/{r temp.g3' -e 'd}' DV.eQTL.merged.no_missing.vcf | bgzip -c >  DV.eQTL.merged.no_missing.vcf2.gz;  tabix -fp vcf DV.eQTL.merged.no_missing.vcf2.gz
+
+
 #awk '{print "0\t"$2"\t"$3}' /cluster/work/pausch/xena/gwas/phenotypes/from_naveen/vzr/BV/sire/phenotypes.txt > vzr.phen
 #grep -f <(bcftools query -l imputed_chip.vcf.gz.vcf.gz) <(bcftools query -l chips_1.vcf.gz) > exclude_samples.txt
 #zcat impute_region.vcf.gz | perl -pe "s/\s\.:/\t.\/.:/g" | bgzip -c > impute_region2.vcf.gz
