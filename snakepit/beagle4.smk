@@ -44,6 +44,8 @@ checkpoint split_vcf:
         OUT_DIR + "{chr}.raw.vcf.gz"
     output:
         directory(OUT_DIR + "CHR{chr}/SPLIT/")
+    resources:
+        mem_mb = 3000
     params:
         prefix=OUT_DIR + "CHR{chr}/SPLIT/part",
         nvar=nvar,
