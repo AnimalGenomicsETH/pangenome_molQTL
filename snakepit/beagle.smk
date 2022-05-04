@@ -35,25 +35,86 @@ rule beagle_phase_vcf:
         java -Xmx40g -jar /cluster/work/pausch/alex/software/beagle.19Apr22.7c0.jar gt={input.vcf} out={params.out} ne=200 nthreads={threads}
         '''
 
+rule tabix_split:
+    input:
+        lambda wildcards: config[wildcards.vcf]
+    output:
+        'gwas/{vcf}.{chr}.vcf.gz'
+    threads: 2
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+        tabix -h {input} {wildcards.chr} | bgzip -c -@ {threads} > {output}
+        tabix -fp vcf {output}
+        '''
 
-rule beagle_impute_chip:
+rule exclude_duplicates:
     input:
         panel = config['vcf_phased'],
         chip = config['chip']
     output:
-        #panel = 'test/region.{chr}.{region}.beagle.vcf.gz',
-        exclude = 'gwas/chip.exclude',
-        chip = 'gwas/sample.beagle.vcf.gz'
-    threads: 6
+        exclude = 'gwas/chip.exclude'
+    shell:
+        'grep -f <(bcftools query -l {input.panel}) <(bcftools query -l {input.chip}) > {output.exclude}'
+
+rule beagle_impute_chip:
+    input:
+        panel = 'gwas/vcf_phased.{chr}.vcf.gz',
+        chip = 'gwas/chip.{chr}.vcf.gz',
+        #chip = config['chip'],
+        exclude = 'gwas/chip.exclude'
+    output:
+        chip = 'gwas/chip.beagle.{chr}.vcf.gz'
+    threads: 8
     resources:
-        mem_mb = 5000
+        mem_mb = 15000,
+        walltime = lambda wildcards: '4:00' if int(wildcards.chr) > 11 else '24:00'
     params:
         chip = lambda wildcards, output: PurePath(output.chip).with_suffix('').with_suffix('')
     shell:
         '''
-        grep -f <(bcftools query -l {input.panel}) <(bcftools query -l {input.chip}) > {output.exclude}
-        java -Xmx40g -jar /cluster/work/pausch/alex/software/beagle.19Apr22.7c0.jar ref={input.panel} gt={input.chip} out={params.chip} ne=200 nthreads={threads} excludesamples={output.exclude}
+        java -Xmx120g -jar /cluster/work/pausch/alex/software/beagle.19Apr22.7c0.jar ref={input.panel} gt={input.chip} out={params.chip} ne=200 nthreads={threads} excludesamples={input.exclude}
         '''
+
+rule bcftools_concat:
+    input:
+        expand('gwas/chip.beagle.{chr}.vcf.gz',chr=range(1,30))
+    output:
+        'gwas/chip.beagle.vcf.gz'
+    threads: 4
+    resources:
+        mem_mb = 5000
+    shell:
+        '''
+        bcftools concat --threads {threads} -o {output} {input}
+        tabix -p vcf {output}
+        '''
+ 
+rule plink_convert:
+    input:
+        'gwas/chip.beagle.vcf.gz'
+    output:
+        'gwas/chip.beagle.pgen'
+    params:
+        out = lambda wildcards, output: PurePath(output[0]).with_suffix('')
+    shell:
+        '''
+        plink2 --vcf {input} --chr-set 30 --make-pgen --memory 8000 --threads {threads} --out {params.out} 
+        '''
+
+rule plink_PCA:
+    input:
+        'gwas/chip.beagle.pgen'
+    output:
+        'gwas/chip.beagle.PCA.eigenvec'
+    params:
+        out = lambda wildcards, output: PurePath(output[0]).with_suffix('')
+    shell:
+        '''
+        plink2 --pfile samples.imputed --pca --out samples.imputed.PCA --memory 8000 --threads 2 --chr-set 30
+        '''
+
 #plink2 --pfile samples.imputed --pheno ../all_phenotypes.txt --out samples.imputed.GLM2 --glm --covar samples.imputed.PCA.eigenvec --memory 8000 --threads 2 --chr-set 30
 
 rule gcta:
@@ -82,7 +143,7 @@ rule qtltools_parallel:
         lambda wildcards,input: f'--permute {config["permutations"]}' if wildcards._pass == 'permutations' else f'--mapping {input.mapping}'
     threads: 1
     resources:
-        mem_mb = 1500,
+        mem_mb = 1024,
         walltime = '4:00'
     shell:
         '''
@@ -113,6 +174,11 @@ rule qtltools_FDR:
         '''
         Rscript ../XENA/qtltools/scripts/qtltools_runFDR_cis.R {input} 0.05 {params.out}
         '''
+
+
+
+#awk ' function abs(v) {return v < 0 ? -v : v} abs(length($4)-length($5))>100' samples.GLM | awk 'NR>1 {print $1"\t"$3"\t"$2"\t"$6"\t"$7"\t"$8"\t"$9"\t"$11"\t"$12}'
+
 
 ##java -Xmx40g -jar /cluster/work/pausch/alex/software/beagle.08Feb22.fa4.jar gt={input.panel} out={params.panel} ne=200 nthreads={threads}
 #/cluster/work/pausch/alex/XENA/qtltools/bin/QTLtools gwas --bed aligned_genes.bed.gz --vcf imputed_chip_unique.vcf.gz --cov /cluster/work/pausch/xena/eQTL/covariates.txt --normal --out gwas_results.txt
