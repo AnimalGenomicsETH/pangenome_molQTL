@@ -68,13 +68,13 @@ rule beagle_impute_chip:
         chip = 'gwas/chip.beagle.{chr}.vcf.gz'
     threads: 8
     resources:
-        mem_mb = 15000,
+        mem_mb = 20000,
         walltime = lambda wildcards: '4:00' if int(wildcards.chr) > 11 else '24:00'
     params:
         chip = lambda wildcards, output: PurePath(output.chip).with_suffix('').with_suffix('')
     shell:
         '''
-        java -Xmx120g -jar /cluster/work/pausch/alex/software/beagle.19Apr22.7c0.jar ref={input.panel} gt={input.chip} out={params.chip} ne=200 nthreads={threads} excludesamples={input.exclude}
+        java -Xmx130g -jar /cluster/work/pausch/alex/software/beagle.19Apr22.7c0.jar ref={input.panel} gt={input.chip} out={params.chip} ne=200 nthreads={threads} excludesamples={input.exclude}
         '''
 
 rule bcftools_concat:
@@ -160,7 +160,7 @@ rule qtltools_gather:
         walltime = '20'
     shell:
         '''
-        sort -k2,2n -k3,3n {input} > {output}
+        sort -k9,9n -k10,10n {input} > {output}
         '''
 
 rule qtltools_FDR:
@@ -175,7 +175,15 @@ rule qtltools_FDR:
         Rscript ../XENA/qtltools/scripts/qtltools_runFDR_cis.R {input} 0.05 {params.out}
         '''
 
-
+rule qtltools_postprocess:
+    input:
+        'eQTL/conditionals.txt'
+    output:
+        'eQTL/significant_hits.fastman'
+    shell:
+        '''
+        awk '($11-$10)>500' {input} | awk '{{print $9"\t"($11-$10)"\t"$10"\tX\teQTL\t2\t"$20"\t"$19"\t"$18}}' >  {output}
+        '''
 
 #awk ' function abs(v) {return v < 0 ? -v : v} abs(length($4)-length($5))>100' samples.GLM | awk 'NR>1 {print $1"\t"$3"\t"$2"\t"$6"\t"$7"\t"$8"\t"$9"\t"$11"\t"$12}'
 
