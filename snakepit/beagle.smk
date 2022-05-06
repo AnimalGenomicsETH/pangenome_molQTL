@@ -74,7 +74,7 @@ rule beagle_impute_chip:
         chip = lambda wildcards, output: PurePath(output.chip).with_suffix('').with_suffix('')
     shell:
         '''
-        java -Xmx130g -jar /cluster/work/pausch/alex/software/beagle.19Apr22.7c0.jar ref={input.panel} gt={input.chip} out={params.chip} ne=200 nthreads={threads} excludesamples={input.exclude}
+        java -Xmx150g -jar /cluster/work/pausch/alex/software/beagle.19Apr22.7c0.jar ref={input.panel} gt={input.chip} out={params.chip} ne=200 nthreads={threads} excludesamples={input.exclude}
         '''
 
 rule bcftools_concat:
@@ -82,9 +82,10 @@ rule bcftools_concat:
         expand('gwas/chip.beagle.{chr}.vcf.gz',chr=range(1,30))
     output:
         'gwas/chip.beagle.vcf.gz'
-    threads: 4
+    threads: 6
     resources:
-        mem_mb = 5000
+        mem_mb = 5000,
+        walltimes = '24:00'
     shell:
         '''
         bcftools concat --threads {threads} -o {output} {input}
@@ -186,7 +187,7 @@ rule qtltools_postprocess:
         '''
 
 #awk ' function abs(v) {return v < 0 ? -v : v} abs(length($4)-length($5))>100' samples.GLM | awk 'NR>1 {print $1"\t"$3"\t"$2"\t"$6"\t"$7"\t"$8"\t"$9"\t"$11"\t"$12}'
-
+#python -c "exec(\"IDs = {L.split()[0]:L.split()[1].rstrip() for L in open('IDs2.txt')}\nfor line in open('eQTL/conditionals.sorted.txt'): print(line.replace('.',IDs['-'.join(line.split()[8:10])],1), end='')\")" > eQTL/conditionals.ID.txt
 
 ##java -Xmx40g -jar /cluster/work/pausch/alex/software/beagle.08Feb22.fa4.jar gt={input.panel} out={params.panel} ne=200 nthreads={threads}
 #/cluster/work/pausch/alex/XENA/qtltools/bin/QTLtools gwas --bed aligned_genes.bed.gz --vcf imputed_chip_unique.vcf.gz --cov /cluster/work/pausch/xena/eQTL/covariates.txt --normal --out gwas_results.txt
