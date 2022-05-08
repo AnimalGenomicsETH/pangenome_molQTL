@@ -85,7 +85,7 @@ rule bcftools_concat:
     threads: 6
     resources:
         mem_mb = 5000,
-        walltimes = '24:00'
+        walltime = '24:00'
     shell:
         '''
         bcftools concat --threads {threads} -o {output} {input}
