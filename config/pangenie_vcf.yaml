@@ -1,0 +1,10 @@
+reference: '/cluster/work/pausch/alex/REF_DATA/ARS-UCD1.2_Btau5.0.1Y.fa'
+assemblies:
+  OxO: ''
+  OSire: ''
+  ODam: ''
+trios:
+  OxO: 'OSire ODam'
+scripts: '/cluster/work/pausch/alex/software/vcf-merging/pangenome-graph-from-assemblies/scripts'
+outdir: ''
+
