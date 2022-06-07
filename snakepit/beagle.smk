@@ -141,14 +141,15 @@ rule qtltools_parallel:
     output:
         merged = temp('eQTL/{_pass}.{chunk}.txt')
     params:
-        lambda wildcards,input: f'--permute {config["permutations"]}' if wildcards._pass == 'permutations' else f'--mapping {input.mapping}'
+        _pass = lambda wildcards,input: f'--permute {config["permutations"]}' if wildcards._pass == 'permutations' else f'--mapping {input.mapping}',
+        debug = '--silent' if 'debug' in config else ''
     threads: 1
     resources:
         mem_mb = 1024,
         walltime = '4:00'
     shell:
         '''
-        QTLtools cis --silent --vcf {input.vcf} --bed {input.bed} --cov {input.cov} {params} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --out {output}
+        QTLtools cis --vcf {input.vcf} --bed {input.bed} --cov {input.cov} {params._pass} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --out {output} {params.debug}
         '''
 
 rule qtltools_gather:
@@ -173,7 +174,7 @@ rule qtltools_FDR:
         out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
     shell:
         '''
-        Rscript ../XENA/qtltools/scripts/qtltools_runFDR_cis.R {input} 0.05 {params.out}
+        Rscript /cluster/work/pausch/alex/software/qtltools/scripts/qtltools_runFDR_cis.R {input} 0.05 {params.out}
         '''
 
 rule qtltools_postprocess:
@@ -185,6 +186,10 @@ rule qtltools_postprocess:
         '''
         awk '($11-$10)>500' {input} | awk '{{print $9"\t"($11-$10)"\t"$10"\tX\teQTL\t2\t"$20"\t"$19"\t"$18}}' >  {output}
         '''
+
+
+
+## DEADCODE ##
 
 #awk ' function abs(v) {return v < 0 ? -v : v} abs(length($4)-length($5))>100' samples.GLM | awk 'NR>1 {print $1"\t"$3"\t"$2"\t"$6"\t"$7"\t"$8"\t"$9"\t"$11"\t"$12}'
 #python -c "exec(\"IDs = {L.split()[0]:L.split()[1].rstrip() for L in open('IDs2.txt')}\nfor line in open('eQTL/conditionals.sorted.txt'): print(line.replace('.',IDs['-'.join(line.split()[8:10])],1), end='')\")" > eQTL/conditionals.ID.txt
