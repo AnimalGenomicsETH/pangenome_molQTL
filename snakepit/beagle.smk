@@ -181,10 +181,10 @@ rule qtltools_postprocess:
     input:
         'eQTL/conditionals.txt'
     output:
-        'eQTL/significant_hits.fastman'
+        'eQTL/significant_hits.{minS}.fastman'
     shell:
         '''
-        awk '($11-$10)>500' {input} | awk '{{print $9"\t"($11-$10)"\t"$10"\tX\teQTL\t2\t"$20"\t"$19"\t"$18}}' >  {output}
+        awk -v L={wildcards.minS} '($11-$10)>=L {{print $9"\t"($11-$10)"\t"$10"\t"$8"\teQTL\t2\t"$20"\t"$19"\t"$18}}' {input} >  {output}
         '''
 
 
