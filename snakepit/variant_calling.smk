@@ -26,11 +26,11 @@ rule sniffles_call:
     output:
         vcf = temp('variant_calling/{sample}.sniffles.vcf.gz'),
         snf = temp('variant_calling/{sample}.sniffles.snf')
-    threads: 12
+    threads: 4
     resources:
-        mem_mb = 5000
+        mem_mb = 2500
     conda:
-        '/cluster/work/pausch/alex/software/miniconda3/envs/sniffles'
+        'sniffles'
     shell:
         '''
         sniffles --input {input.bam} --reference {config[reference]} --threads {threads} --vcf {output.vcf} --snf {output.snf}
@@ -41,9 +41,9 @@ rule sniffles_merge:
         snfs = expand('variant_calling/{sample}.sniffles.snf',sample=config['HiFi'])
     output:
         vcf = 'variant_calling/samples.sniffles.vcf.gz'
-    threads: 4
+    threads: 2
     resources:
-        mem_mb = 5000
+        mem_mb = 2500
     conda:
         'sniffles'
     shell:
