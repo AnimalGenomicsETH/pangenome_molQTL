@@ -1,6 +1,6 @@
 rule all:
     input:
-        expand('variant_calling/samples.{V}.vcf.gz',V=('sniffles','bcftools')),
+        expand('variant_calling/samples.{V}.vcf.gz',V=('sniffles',)),
         'DV-SR/cohort.autosomes.WGS.vcf.gz',
         'DV-LR/cohort.autosomes.WGS.vcf.gz'
 
@@ -33,7 +33,7 @@ rule sniffles_call:
         'sniffles'
     shell:
         '''
-        sniffles --input {input.bam} --reference {config[reference]} --threads {threads} --vcf {output.vcf} --snf {output.snf}
+        sniffles --input {input.bam} --reference {config[reference]} --sample-id {wildcards.sample} --threads {threads} --vcf {output.vcf} --snf {output.snf}
         '''
 
 rule sniffles_merge:
@@ -51,18 +51,71 @@ rule sniffles_merge:
         sniffles --input {input.snfs} --reference {config[reference]} --threads {threads} --vcf {output.vcf}
         '''
 
-rule bcftools_merge:
+rule bcftools_autosomes:
     input:
-        vcfs = expand('variant_calling/{sample}.sniffles.vcf.gz',sample=config['HiFi'])
+        'variant_calling/samples.sniffles.vcf.gz'
     output:
-        vcf = 'variant_calling/samples.bcftools.vcf.gz'
-    threads: 4
+        'variant_calling/samples.sniffles.autosomes.vcf'
+    threads: 2
     resources:
-        mem_mb = 5000
+        mem_mb = 4000
+    params:
+        regions = ','.join(map(str,range(1,30)))
     shell:
         '''
-        bcftools merge --threads {threads} -o {output} {input.vcfs}
-        tabix -fp vcf {output}
+        bcftools view --threads {threads} -r {params.regions} -o {output} {input}
+        '''
+
+rule bcftool_split_panel:
+    output:
+        SV = 'variant_calling/panel.SV.vcf',
+        small = 'variant_calling/panel.small.vcf.gz'
+    params:
+        SV_size = config['SV_size'],
+        bcf = '$TMPDIR/normed.bcf'
+    threads: 2
+    resources:
+        mem_mb = 4000,
+        disk_scratch = 10
+    shell:
+        '''
+        bcftools norm --threads {threads} -f {config[reference]} -m -any {config[panel]} -Ou {input} > {params.bcf}
+        bcftools view -i 'abs(ILEN)>={params.SV_size}' -o {output.SV} {params.bcf}
+        bcftools view -i 'abs(ILEN)<{params.SV_size}' -o {output.small} {params.bcf}
+        tabix -fp vcf {output.small}
+        '''
+
+rule jasmine_intersect:
+    input:
+        read = 'variant_calling/samples.sniffles.autosomes.vcf',
+        asm = 'variant_calling/panel.SV.vcf'
+    output:
+        'jasmine.vcf'
+    params:
+        _input = lambda wildcards, input: ','.join(input)
+    conda:
+        'jasmine'
+    threads: 2
+    resources:
+        mem_mb = 3000,
+        disk_scratch = 5
+    shell:
+        '''
+        jasmine --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR spec_reads=0 genome_file={config[reference]} min_seq_id=.5 --pre_normalize
+        '''
+
+rule bcftools_isec:
+    input:
+        read = 'DV-LR/cohort.autosomes.WGS.vcf.gz',
+        asm = 'variant_calling/panel.small.vcf.gz'
+    output:
+        'isec'
+    threads: 4
+    resources:
+        mem_mb = 3000
+    shell:
+        '''
+        bcftools isec --threads {threads} -o {output} {input}
         '''
 
 ### IMPORT DEEPVARIANT MODULES
