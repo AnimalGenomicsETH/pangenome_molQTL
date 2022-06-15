@@ -24,7 +24,7 @@ scripts = config['scripts']
 mscripts = config['mscripts']
 outdir = config['outdir']
 chromosomes = list(map(str,range(1,30))) #[str(i) for i in range(1,23)] + [config['reference']['prefix'] + 'X', config['reference']['prefix'] + 'Y']
-frac_missing = 0.2 # skip positions with more than this fraction of missing alleles
+frac_missing = config.get('frac_missing',0.2) # skip positions with more than this fraction of missing alleles
 
 # paftools skips contig-alignments shorter than this threshold
 min_alignment_len = 50000
@@ -32,9 +32,10 @@ min_alignment_len = 50000
 rule all:
     input:
         outdir + "multisample-vcfs/graph-filtered.vcf",
-        outdir + "multisample-vcfs/callset-filtered.vcf",
-        outdir + "statistics/vcftools-plots/indel-histogram.pdf",
-        outdir + "statistics/vcfstats-stats.txt"
+        #outdir + "multisample-vcfs/callset-filtered.vcf",
+        #expand(outdir + "calls/{sample}-hap{haplotype}.vcf",haplotype=(0,1),sample=samples),
+        #outdir + "statistics/vcftools-plots/indel-histogram.pdf",
+        #outdir + "statistics/vcfstats-stats.txt"
 
 
 
@@ -51,9 +52,11 @@ rule align_assemblies:
     threads: 8
     resources:
         mem_mb = 8000
+    params:
+        mm2_opt = config.get('mm2_opt','-x asm20 -m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5')
     shell:
         '''
-        minimap2 -ax asm20 -m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 --cs -t {threads} {input.reference} {input.contigs} > {output}
+        minimap2 -a {params.mm2_opt} --cs -t {threads} {input.reference} {input.contigs} > {output}
         '''
 
 # align assemblies to reference genome
@@ -294,7 +297,7 @@ rule check_mendelian_consistency:
         walltime = '24:00'
     shell:
         """
-        python3 {scripts}/mendelian-consistency.py filter -vcf {input.vcf} -samples {input.samples} -ped {input.ped} -o {output.tsv} > {output.vcf}
+        python3 {mscripts}/mendelian-consistency.py filter -vcf {input.vcf} -samples {input.samples} -ped {input.ped} -o {output.tsv} > {output.vcf}
         """
 
 rule merge_haplotypes:
@@ -328,7 +331,7 @@ rule normalize_vcf:
     resources:
         mem_mb = 5000
     shell:
-        "bcftools concat --threads {threads} -Ou {input.vcfs} | bcftools norm --threads {threads} -d all -f {input.reference} - > {output}"
+        "bcftools concat --threads {threads} -Ou {input.vcfs} | bcftools norm --threads {threads} -m +any -d all -f {input.reference} - > {output}"
 
 
 rule vcfstats_statistics:

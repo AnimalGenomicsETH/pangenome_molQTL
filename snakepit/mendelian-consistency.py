@@ -1,10 +1,10 @@
 import sys
 import argparse
 import vcf
-from variantclassifier import VariantType, determine_pyvcf_type
-import matplotlib
-matplotlib.use('agg')
-import matplotlib.pyplot as plt
+#from variantclassifier import VariantType, determine_pyvcf_type
+#import matplotlib
+#matplotlib.use('agg')
+#import matplotlib.pyplot as plt
 import numpy as np 
 
 def check_mendelian_consistency(child_gt, parent1_gt, parent2_gt):
@@ -252,8 +252,9 @@ def run_mendelian(vcf, ped, samples, output, remove_children=False):
 			inconsistent = float(trios[trio][4])
 			untyped = float(trios[trio][5])
 			total = float(trios[trio][6])
-			assert consistent+inconsistent+untyped == total
-			print(consistent,total,untyped,inconsistent)
+			#sys.stderr.write(' '.join(map(str,[consistent,total,untyped,inconsistent])))
+			#assert consistent+inconsistent+untyped == total
+			#print(consistent,total,untyped,inconsistent)
 			mendelian_consistency = consistent / total 
 			outfile.write('\t'.join(['-'.join(trio), str(consistent), str(inconsistent), str(untyped), str(total), str(mendelian_consistency)]) + '\n')
 
