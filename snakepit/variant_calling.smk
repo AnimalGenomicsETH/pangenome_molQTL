@@ -66,7 +66,7 @@ rule bcftools_autosomes:
         bcftools view --threads {threads} -r {params.regions} -o {output} {input}
         '''
 
-rule bcftool_split_panel:
+rule bcftools_split_panel:
     output:
         SV = 'variant_calling/panel.SV.vcf',
         small = 'variant_calling/panel.small.vcf.gz'
@@ -106,16 +106,18 @@ rule jasmine_intersect:
 
 rule bcftools_isec:
     input:
-        read = 'DV-LR/cohort.autosomes.WGS.vcf.gz',
+        read = 'DV-{read}/cohort.autosomes.WGS.vcf.gz',
         asm = 'variant_calling/panel.small.vcf.gz'
     output:
-        'isec'
-    threads: 4
+        isec = 'isec_{read}_{strictness}.txt',
+        _count = 'isec_{read}_{strictness}.count'
+    threads: 2
     resources:
         mem_mb = 3000
     shell:
         '''
-        bcftools isec --threads {threads} -o {output} {input}
+        bcftools isec --threads {threads} -n +1 -o {output.isec} -c {wildcards.strictness} {input}
+        cut -f 5 {output.isec} | sort | uniq -c > {output._count}
         '''
 
 ### IMPORT DEEPVARIANT MODULES
