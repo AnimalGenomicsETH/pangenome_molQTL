@@ -89,7 +89,7 @@ rule direct_pangenie:
     resources:
         mem_mb = 13000,
         disk_scratch = 75,
-        walltime = '4:00'
+        walltime = '24:00'
     shell:
         '''
         fastp -w {threads} -i {input.fastq[0]} -I {input.fastq[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | jellyfish count -L 1 -U 10000 -m 31 -s 3000000000 -p 126 -c 7 -C -t {threads} --if {input.paths} -o $TMPDIR/{wildcards.sample}.jf /dev/fd/0
@@ -123,6 +123,33 @@ rule merge_pangenie:
         '''
         bcftools merge --threads {threads} -o {output} {input.vcf}
         tabix -p vcf {output}
+        '''
+
+rule extract_SVs:
+    input:
+        get_dir('PG','samples.all.pangenie_{pangenie_mode}.vcf.gz')
+    output:
+        get_dir('PG','samples.all.pangenie_{pangenie_mode}.SVs.vcf.gz')
+    threads: 2
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+        bcftools view --threads {threads} -i 'abs(ILEN)>50' -o {output} {input}
+        '''
+
+rule merge_with_population_SR:
+    input:
+        pangenie = get_dir('PG','samples.all.pangenie_{pangenie_mode}.vcf.gz'),
+        DV = config['DV-SR']
+    output:
+        get_dir('PG','samples.all.pangenie_{pangenie_mode}_DV.vcf.gz')
+    threads: 2
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+        bcftools concat -a -D --threads {threads} {input} | bcftools norm --threads {threads} -f {config[reference]} -D -m -any - | bcftools annotate --threads {threads} --set-id +'%CHROM\_%POS\_%TYPE' -o {output} -
         '''
 
 rule compare_pangenie:
