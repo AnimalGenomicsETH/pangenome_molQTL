@@ -144,12 +144,13 @@ rule merge_with_population_SR:
         DV = config['DV-SR']
     output:
         get_dir('PG','samples.all.pangenie_{pangenie_mode}_DV.vcf.gz')
-    threads: 2
+    threads: 4
     resources:
-        mem_mb = 2500
+        mem_mb = 2500,
+        disk_scratch = 75
     shell:
         '''
-        bcftools concat -a -D --threads {threads} {input} | bcftools norm --threads {threads} -f {config[reference]} -D -m -any - | bcftools annotate --threads {threads} --set-id +'%CHROM\_%POS\_%TYPE' -o {output} -
+        bcftools concat -a -D --threads {threads} {input} | bcftools view -e 'FILTER="MONOALLELIC"' - | bcftools norm --threads {threads} -f {config[reference]} -D - | bcftools sort -T $TMPDIR - | bcftools annotate --threads {threads} --set-id +'%CHROM\_%POS\_%TYPE' -o {output} -
         '''
 
 rule compare_pangenie:
