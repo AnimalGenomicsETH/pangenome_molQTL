@@ -64,7 +64,7 @@ checkpoint bcftools_scatter:
         mem_mb = 2500
     shell:
         '''
-        bcftools +scatter {input.vcf} --threads {threads} -S {input.scatter} -Oz -p chunk -o {output}
+        bcftools +scatter {input.vcf} --threads {threads} -S {input.scatter} -Oz -p chunk- -o {output}
         '''
 
 rule beagle4:
