@@ -31,6 +31,9 @@ chromosomes = list(map(str,range(1,30)))
 
 from pathlib import PurePath
 
+wildcard_constraints:
+    chunk = r'\d*:\d*-\d*'
+
 rule all:				      
     input:
         'pangenie_DV_imputed/samples.all.pangenie_genotyping_DV.imputed.vcf.gz'
@@ -93,13 +96,16 @@ rule beagle4:
 
 def aggregate_scatter(wildcards):
     checkpoint_dir = checkpoints.bcftools_scatter.get(**wildcards).output[0]
-    return expand('pangenie_DV_scatter/chunk-{chunk}.imputed.vcf.gz',chunk=glob_wildcards(PurePath(checkpoint_dir).joinpath('chunk-{chunk}.vcf.gz')).chunk)
+    return expand('pangenie_DV_scatter/chunk-{chunk}.imputed.vcf.gz',chunk=glob_wildcards(PurePath(checkpoint_dir).joinpath('chunk-{chunk,\d*:\d*-\d*}.vcf.gz')).chunk)
 
 rule merge_vcfs:
     input:
         aggregate_scatter
     output:
         'pangenie_DV_imputed/samples.all.pangenie_genotyping_DV.imputed.vcf.gz'
+    threads: 2
+    resources:
+        mem_mb = 2500
     script:
         '''
         bcftools concat --allow-overlaps --ligate --threads {threads} -o {output} {input}
