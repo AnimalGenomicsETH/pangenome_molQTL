@@ -106,7 +106,7 @@ rule merge_vcfs:
     threads: 2
     resources:
         mem_mb = 2500
-    script:
+    shell:
         '''
         bcftools concat --allow-overlaps --ligate --threads {threads} -o {output} {input}
         tabix -p vcf {output}
