@@ -96,7 +96,7 @@ rule beagle4:
 
 def aggregate_scatter(wildcards):
     checkpoint_dir = checkpoints.bcftools_scatter.get(**wildcards).output[0]
-    return expand('pangenie_DV_scatter/chunk-{chunk}.imputed.vcf.gz',chunk=glob_wildcards(PurePath(checkpoint_dir).joinpath('chunk-{chunk,\d*:\d*-\d*}.vcf.gz')).chunk)
+    return sorted([f'pangenie_DV_scatter/chunk-{chunk}.imputed.vcf.gz' for chunk in glob_wildcards(PurePath(checkpoint_dir).joinpath('chunk-{chunk,\d*:\d*-\d*}.vcf.gz')).chunk])
 
 rule merge_vcfs:
     input:
@@ -108,7 +108,8 @@ rule merge_vcfs:
         mem_mb = 2500
     shell:
         '''
-        bcftools concat --allow-overlaps --ligate --threads {threads} -o {output} {input}
+        bcftools concat --threads {threads} -a -d exact -o {output} {input}
+        #bcftools concat --ligate-force --threads {threads} -o {output} {input}
         tabix -p vcf {output}
         '''
         
