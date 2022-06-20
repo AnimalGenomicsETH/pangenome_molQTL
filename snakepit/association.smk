@@ -26,13 +26,19 @@ rule beagle_phase_vcf:
     output:
         config['vcf_phased']
     params:
-        lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
-    threads: 18
+        out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix(''),
+        mem = lambda wildcards, threads, resources: int(threads*resources.mem_mb/1024)
+    threads: 24
     resources:
-        mem_mb = 1500
+        mem_mb = 5000,
+        walltime = '24:00'
     shell:
         '''
-        java -Xmx40g -jar /cluster/work/pausch/alex/software/beagle.19Apr22.7c0.jar gt={input.vcf} out={params.out} ne=200 nthreads={threads}
+        java -Xmx{params.mem}g -jar {config[beagle]} \
+        gt={input} \
+        ne=200 \
+        out={params.out} \
+        nthreads={threads}
         '''
 
 rule tabix_split:
@@ -66,15 +72,16 @@ rule beagle_impute_chip:
         exclude = 'gwas/chip.exclude'
     output:
         chip = 'gwas/chip.beagle.{chr}.vcf.gz'
-    threads: 8
+    threads: 12
     resources:
         mem_mb = 20000,
-        walltime = lambda wildcards: '4:00' if int(wildcards.chr) > 11 else '24:00'
+        walltime = lambda wildcards: '4:00' if int(wildcards.chr) > 0 else '24:00'
     params:
-        chip = lambda wildcards, output: PurePath(output.chip).with_suffix('').with_suffix('')
+        chip = lambda wildcards, output: PurePath(output.chip).with_suffix('').with_suffix(''),
+        mem = lambda wildcards, threads, resources: int(threads*resources.mem_mb/1024)
     shell:
         '''
-        java -Xmx150g -jar /cluster/work/pausch/alex/software/beagle.19Apr22.7c0.jar ref={input.panel} gt={input.chip} out={params.chip} ne=200 nthreads={threads} excludesamples={input.exclude}
+        java -Xmx{params.mem}g -jar {config[beagle]} ref={input.panel} gt={input.chip} out={params.chip} ne=200 nthreads={threads} excludesamples={input.exclude}
         '''
 
 rule bcftools_concat:
@@ -134,7 +141,7 @@ rule gcta:
 
 rule qtltools_parallel:
     input:
-        vcf = config['vcf'],
+        vcf = config['vcf_phased'],
         bed = config['bed'],
         cov = config['cov'],
         mapping = lambda wildcards: 'eQTL/permutations_all.thresholds.txt' if wildcards._pass == 'conditionals' else []
@@ -146,11 +153,13 @@ rule qtltools_parallel:
     threads: 1
     resources:
         mem_mb = 1024,
-        walltime = '4:00'
+        walltime = lambda wildcards: '24:00' if wildcards._pass == 'permutations' else '4:00'
     shell:
         '''
         QTLtools cis --vcf {input.vcf} --bed {input.bed} --cov {input.cov} {params._pass} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --out {output} {params.debug}
         '''
+
+localrules: qtltools_gather
 
 rule qtltools_gather:
     input:
