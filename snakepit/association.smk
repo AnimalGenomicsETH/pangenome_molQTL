@@ -190,7 +190,7 @@ rule qtltools_parallel:
         #mapping = lambda wildcards: '{qtl}/permutations_all.thresholds.txt' if wildcards._pass == 'conditionals' else []
         bed = lambda wildcards: config['genes'][wildcards.qtl],
         cov = lambda wildcards: config['covariates'][wildcards.qtl],
-        mapping = lambda wildcards: '{qtl}/permutations_all.thresholds.{MAF}.txt' if wildcards._pass == 'conditionals' else [],
+        mapping = lambda wildcards: '{qtl}/permutations_all.{MAF}.thresholds.txt' if wildcards._pass == 'conditionals' else [],
         exclude = 'eQTL/exclude_sites.{MAF}.txt'
     output:
         merged = temp('{qtl}/{_pass}.{chunk}.{MAF}.txt')
@@ -202,7 +202,7 @@ rule qtltools_parallel:
     threads: 1
     resources:
         mem_mb = 1024,
-        walltime = lambda wildcards: '4:00' if wildcards._pass == 'permutations' else '30'
+        walltime = lambda wildcards: '24:00' if wildcards._pass == 'permutations' else '30'
     shell:
         '''
         QTLtools cis --vcf {input.vcf} --bed {input.bed} --cov {input.cov} {params._pass} {params.grp} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --out {output} {params.debug}
@@ -227,7 +227,7 @@ rule qtltools_FDR:
     input:
         'eQTL/permutations.{MAF}.txt'
     output:
-        'eQTL/permutations_all.thresholds.{MAF}.txt'
+        'eQTL/permutations_all.{MAF}.thresholds.txt'
     params:
         out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
     shell:
@@ -246,6 +246,10 @@ rule qtltools_postprocess:
         awk -v L={wildcards.minS} '($11-$10)>=L {{print $9"\t"($11-$10)"\t"$10"\t"$8"\tN\teQTL\t2\t"$20"\t"$19"\t"$18}}' {input} >>  {output}
         '''
 
+
+
+# plink2 --cow --vcf {input.vcf} --make-bed --out --threads {threads} --memory {params.memory}
+# gcta --pfile --autosome-num 29 --maf {params.maf} --make-grm --out {params.prefix} --threads 4
 
 
 ## DEADCODE ##
