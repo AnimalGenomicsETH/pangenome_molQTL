@@ -212,9 +212,9 @@ localrules: qtltools_gather, qtltools_postprocess
 
 rule qtltools_gather:
     input:
-        expand('eQTL/{{_pass}}.{chunk}.{{MAF}}.txt',chunk=range(1,config['chunks']+1))
+        expand('{{qtl}}/{{_pass}}.{chunk}.{{MAF}}.txt',chunk=range(1,config['chunks']+1))
     output:
-        'eQTL/{_pass}.{MAF}.txt'
+        '{qtl}/{_pass}.{MAF}.txt'
     resources:
         mem_mb = 3000,
         walltime = '20'
@@ -225,9 +225,9 @@ rule qtltools_gather:
 
 rule qtltools_FDR:
     input:
-        'eQTL/permutations.{MAF}.txt'
+        '{qtl}/permutations.{MAF}.txt'
     output:
-        'eQTL/permutations_all.{MAF}.thresholds.txt'
+        '{qtl}/permutations_all.{MAF}.thresholds.txt'
     params:
         out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
     shell:
@@ -237,9 +237,9 @@ rule qtltools_FDR:
 
 rule qtltools_postprocess:
     input:
-        'eQTL/conditionals.{MAF}.txt'
+        '{qtl}/conditionals.{MAF}.txt'
     output:
-        'eQTL/significant_hits.{minS}.{MAF}.fastman'
+        '{qtl}/significant_hits.{minS}.{MAF}.fastman'
     shell:
         '''
         echo "CHR\tsize\tBP\tSNP\tA1\tTEST\tNMISS\tBETA\tSTAT\tP" > {output}
