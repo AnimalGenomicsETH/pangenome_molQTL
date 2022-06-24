@@ -81,7 +81,7 @@ rule bcftools_split_panel:
         '''
         bcftools norm --threads {threads} -f {config[reference]} -m -any {config[panel]} -Ou {input} > {params.bcf}
         bcftools view -i 'abs(ILEN)>={params.SV_size}' -o {output.SV} {params.bcf}
-        bcftools view -i 'abs(ILEN)<{params.SV_size}' -o {output.small} {params.bcf}
+        bcftools view -e 'abs(ILEN)>={params.SV_size}' -o {output.small} {params.bcf}
         tabix -fp vcf {output.small}
         '''
 
@@ -101,13 +101,15 @@ rule jasmine_intersect:
         disk_scratch = 5
     shell:
         '''
-        jasmine --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR spec_reads=0 genome_file={config[reference]} min_seq_id=.5 --pre_normalize
+        jasmine --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR spec_reads=0 genome_file={config[reference]} min_seq_id=.5 --pre_normalize --ignore_strand --allow_intrasample --normalize_type
+        grep -vE "SVTYPE=(INV|TRA)" jasmine.vcf | grep -oP "(SVLEN=-?\d*|SUPP_VEC=\d{2})" | sed 's/[A-Z,=,_]*//g'  | paste -s -d' \n' > jasmine_SV_lens.txt
         '''
 
 rule bcftools_isec:
     input:
-        read = 'DV-{read}/cohort.autosomes.WGS.vcf.gz',
-        asm = 'variant_calling/panel.small.vcf.gz'
+        read = 'DV_small.vcf.gz',#'DV-{read}/cohort.autosomes.WGS.vcf.gz',
+        asm = 'variant_calling/panel.small.vcf.gz',
+        other = 'panel.raw.small.vcf.gz'
     output:
         isec = 'isec_{read}_{strictness}.txt',
         _count = 'isec_{read}_{strictness}.count'
