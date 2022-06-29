@@ -26,7 +26,7 @@ rule determine_scatter:
 
 checkpoint bcftools_scatter:
     input:
-        vcf = 'pangenie/samples.all.pangenie_genotyping_DV.vcf.gz',
+        vcf = 'pangenie/samples.all.pangenie_genotyping_DV.X.vcf.gz',
         scatter = 'scatter.txt'
     output:
         temp(directory('pangenie_DV_scatter'))
@@ -62,9 +62,14 @@ rule beagle4:
         out={params.prefix}
         '''
 
+import subprocess
+def empty_vcf(vcf):
+    #hardcode removing the .imputed to get the original vcf filename
+    return subprocess.getoutput(f"zgrep -v '#' {vcf.replace('.imputed','')} | wc -l ").strip() != "0"
+
 def aggregate_scatter(wildcards):
     checkpoint_dir = checkpoints.bcftools_scatter.get(**wildcards).output[0]
-    return sorted([f'pangenie_DV_scatter/chunk-{chunk}.imputed.vcf.gz' for chunk in glob_wildcards(PurePath(checkpoint_dir).joinpath('chunk-{chunk,\d*:\d*-\d*}.vcf.gz')).chunk])
+    return list(filter(empty_vcf,sorted([f'pangenie_DV_scatter/chunk-{chunk}.imputed.vcf.gz' for chunk in glob_wildcards(PurePath(checkpoint_dir).joinpath('chunk-{chunk,\d*:\d*-\d*}.vcf.gz')).chunk])))
 
 rule merge_vcfs:
     input:
