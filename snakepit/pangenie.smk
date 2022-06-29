@@ -140,17 +140,24 @@ rule extract_SVs:
 
 rule merge_with_population_SR:
     input:
-        pangenie = get_dir('PG','samples.all.pangenie_{pangenie_mode}.vcf.gz'),
-        DV = config['DV-SR']
+        DV = config['DV-SR'],
+        pangenie = get_dir('PG','samples.all.pangenie_{pangenie_mode}.vcf.gz')
     output:
         get_dir('PG','samples.all.pangenie_{pangenie_mode}_DV.vcf.gz')
-    threads: 4
+    threads: 8
     resources:
         mem_mb = 2500,
-        disk_scratch = 75
+        disk_scratch = 75,
+        walltime = '24:00'
     shell:
         '''
-        bcftools concat -a -D --threads {threads} {input} | bcftools view -e 'FILTER="MONOALLELIC"' - | bcftools norm --threads {threads} -f {config[reference]} -D - | bcftools sort -T $TMPDIR - | bcftools annotate --threads {threads} --set-id +'%CHROM\_%POS\_%TYPE' -o {output} -
+        bcftools concat -a -D --threads {threads} -Ou {input}| \
+        bcftools view -e 'FILTER="MONOALLELIC"' -Ou - | \
+        bcftools norm --threads {threads} -f {config[reference]} -m -any -Ou - | \
+        bcftools norm --threads {threads} -f {config[reference]} -d none -Ou - | \
+        bcftools norm --threads {threads} -f {config[reference]} -m +any -Ou - | \
+        bcftools sort -T $TMPDIR -Ou - | \
+        bcftools annotate --threads {threads} --set-id '%CHROM\_%POS\_%REF\_%ALT' -o {output} -
         '''
 
 rule compare_pangenie:
