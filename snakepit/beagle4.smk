@@ -1,49 +1,17 @@
-
-
-reference_file="/cluster/work/pausch/inputs/ref/BTA/UCD1.2/ARS-UCD1.2_Btau5.0.1Y.fa"
-OUT_DIR="/cluster/work/pausch/alex/BSW_OBV_SVs/pangenie_imputed/"
-IN_DIR="/cluster/work/pausch/alex/BSW_OBV_SVs/pangenie/"
-
-
-#tools
-BEAGLE='/cluster/work/pausch/alex/software/beagle.27Jan18.7e1.jar'
-
-
-##parameters for split_vcf
-#nvar=50_000
-#overlap=5_000
-
-
-#nvar=200_000
-#overlap=5_000
-nvar=60_000
-overlap=5_000
-
-
-
-##paramterrs for Beagle
-window= int(nvar*1.5 + overlap) #beagles default window size is 50k variants [this is the biggest possible window -- by split.vcf]
-
-##chromosomes=list(range (1,30)) + ["X", "Y"]
-chromosomes = list(map(str,range(1,30)))
-#chromosomes = [el for el in chromosomes if el !=26]
-#chromosomes=["Y"]
-
 from pathlib import PurePath
 
 wildcard_constraints:
     chunk = r'\d*:\d*-\d*'
 
+chromosomes = list(map(str,range(1,30)))
+
 rule all:				      
     input:
         'pangenie_DV_imputed/samples.all.pangenie_genotyping_DV.imputed.vcf.gz'
-        #expand (OUT_DIR + "CHR{chr}/PHASED/clean_beagle4.1.vcf.gz", chr=chromosomes),
-        #expand (OUT_DIR + "CHR{chr}/PHASED/clean_beagle4.1.vcf.gz.tbi", chr=chromosomes)
-
 
 rule determine_scatter:
     output:
-        'scatter.txt'
+        temp('scatter.txt')
     params:
         window = config['window'],
         overlap = config['overlap']
@@ -61,7 +29,7 @@ checkpoint bcftools_scatter:
         vcf = 'pangenie/samples.all.pangenie_genotyping_DV.vcf.gz',
         scatter = 'scatter.txt'
     output:
-        directory('pangenie_DV_scatter')
+        temp(directory('pangenie_DV_scatter'))
     threads: 4
     resources:
         mem_mb = 2500
@@ -74,7 +42,7 @@ rule beagle4:
     input:
         'pangenie_DV_scatter/chunk-{chunk}.vcf.gz'
     output:
-        'pangenie_DV_scatter/chunk-{chunk}.imputed.vcf.gz'
+        temp('pangenie_DV_scatter/chunk-{chunk}.imputed.vcf.gz')
     threads: 6
     resources:
         mem_mb = 4000
@@ -109,9 +77,5 @@ rule merge_vcfs:
     shell:
         '''
         bcftools concat --threads {threads} -a -d exact -o {output} {input}
-        #bcftools concat --ligate-force --threads {threads} -o {output} {input}
         tabix -p vcf {output}
         '''
-        
-
-
