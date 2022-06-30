@@ -2,7 +2,7 @@ from pathlib import PurePath
 import subprocess
 
 wildcard_constraints:
-    chunk = r'\d*:\d*-\d*'
+    chunk = r'\d*'
 
 chromosomes = list(map(str,range(1,30)))
 
@@ -28,28 +28,29 @@ rule determine_scatter:
 checkpoint bcftools_scatter:
     input:
         vcf = 'pangenie/samples.all.pangenie_genotyping_DV.vcf.gz',
-        scatter = 'scatter.txt'
+        #scatter = 'scatter.txt'
     output:
         temp(directory('pangenie_DV_scatter'))
     threads: 4
     resources:
         mem_mb = 2500
+    params:
+        scatter = ','.join(chromosomes),
+        prefix = 'raw.chr'
     shell:
         '''
-        bcftools +scatter {input.vcf} --threads {threads} -S {input.scatter} -Oz -p chunk- -o {output}
+        bcftools +scatter {input.vcf} --threads {threads} -s {params.scatter} -Oz -p {params.prefix} -o {output}
         '''
 
 rule beagle4_impute:
     input:
-        'pangenie/samples.all.pangenie_genotyping_DV.vcf.gz'
-        #'pangenie_DV_scatter/chunk-{chunk}.vcf.gz'
+        lambda wildcards: f'pangenie_DV_scatter/{"raw" if wildcards.out == "phased" else "raw"}.chr{{chunk}}.vcf.gz'
     output:
-        #temp('pangenie_DV_scatter/chunk-{chunk}.imputed.vcf.gz')
-        'pangenie_DV_imputed/samples.all.pangenie_genotyping_DV.imputed.vcf.gz'
-    threads: 24
+        temp('pangenie_DV_scatter/{out,imputed|phased}.chr{chunk}.vcf.gz')
+    threads: 8
     resources:
         mem_mb = 4000,
-        walltime = '24:00'
+        walltime = '4:00'
     params:
         prefix = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix(''),
 	    ne = 200,
@@ -62,6 +63,7 @@ rule beagle4_impute:
         gt={input} \
         nthreads={threads} \
         out={params.prefix}
+        tabix -fp vcf {output}
         '''
 
 def empty_vcf(vcf):
@@ -70,13 +72,13 @@ def empty_vcf(vcf):
 
 def aggregate_scatter(wildcards):
     checkpoint_dir = checkpoints.bcftools_scatter.get(**wildcards).output[0]
-    return list(filter(empty_vcf,sorted([f'pangenie_DV_scatter/chunk-{chunk}.imputed.vcf.gz' for chunk in glob_wildcards(PurePath(checkpoint_dir).joinpath('chunk-{chunk,\d*:\d*-\d*}.vcf.gz')).chunk])))
+    return sorted([f'pangenie_DV_scatter/phased.chr{chunk}.vcf.gz' for chunk in glob_wildcards(PurePath(checkpoint_dir).joinpath('raw.chr{chunk,\d*}.vcf.gz')).chunk])
 
 rule merge_vcfs:
     input:
         aggregate_scatter
     output:
-        'pangenie_DV_imputed/samples.all.pangenie_genotyping_DV.imputed.X.vcf.gz'
+        'pangenie_DV_imputed/samples.all.pangenie_genotyping_DV.imputed.phased.vcf.gz'
     threads: 2
     resources:
         mem_mb = 2500
@@ -90,7 +92,7 @@ rule beagle_phase_vcf:
     input:
         'pangenie_DV_imputed/samples.all.pangenie_genotyping_DV.imputed.vcf.gz'
     output:
-        'pangenie_DV_imputed/samples.all.pangenie_genotyping_DV.imputed.phased.vcf.gz'
+        'pangenie_DV_imputed/samples.all.pangenie_genotyping_DV.imputed.phased.X.vcf.gz'
     params:
         out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix(''),
         mem = lambda wildcards, threads, resources: int(threads*resources.mem_mb/1024),
