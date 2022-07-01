@@ -104,6 +104,8 @@ rule jasmine_intersect:
         jasmine --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR spec_reads=0 genome_file={config[reference]} min_seq_id=.5 --pre_normalize --ignore_strand --allow_intrasample --normalize_type
         grep -vE "SVTYPE=(INV|TRA)" jasmine.vcf | grep -oP "(SVLEN=-?\d*|SUPP_VEC=\d{2})" | sed 's/[A-Z,=,_]*//g'  | paste -s -d' \n' > jasmine_SV_lens.txt
         '''
+#jasmine --comma_filelist file_list=smoove_SV/All_filter_type.vcf,eQTL_GWAS/variants/variant_calling/panel.SV.vcf threads=1 out_file=SR_LR.vcf out_dir=$TMPDIR spec_reads=0 genome_file=REF_DATA/ARS-UCD1.2_Btau5.0.1Y.fa min_seq_id=0 --pre_normalize --ignore_strand --allow_intrasample max_dist_linear=1 --normalize_type --dup_to_ins
+#bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t0\t+\t%POS\t%INFO/END\t%INFO/SUPP_VEC\n' SR_LR.vcf | grep -vE "(INV|TRA)"  | sed s'/10$/50,200,50/g' | sed s'/11$/250,100,150/g' | sed s'/01$/50,20,250/g' >> SR_LR.bed 
 
 rule bcftools_isec:
     input:
