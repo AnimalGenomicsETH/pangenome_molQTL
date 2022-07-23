@@ -1,7 +1,7 @@
 from pathlib import PurePath
 
 wildcard_constraints:
-    _pass = r'permutations|conditionals',
+    _pass = r'permutations|conditionals|nominals',
     chunk = r'\d+',
     chrom = r'\d+',
     MAF = r'\d+',
@@ -55,13 +55,14 @@ rule beagle_impute_chip:
         chip = 'gwas/chip.beagle.{chrom}.vcf.gz'
     threads: 12
     resources:
-        mem_mb = lambda wildcards: 15000 if int(wildcards.chrom) > 2 else 25000,
+        mem_mb = lambda wildcards: 20000 if int(wildcards.chrom) > 2 else 25000,
         walltime = lambda wildcards: '4:00' if int(wildcards.chrom) > 2 else '24:00'
     params:
         chip = lambda wildcards, output: PurePath(output.chip).with_suffix('').with_suffix(''),
         mem = lambda wildcards, threads, resources: int(threads*resources.mem_mb/1024),
         ne = 200,
         beagle = config['beagle5']
+    retries: 1
     shell:
         '''
         java -Xmx{params.mem}g -jar {params.beagle} \
@@ -76,17 +77,18 @@ rule beagle_impute_chip:
 
 rule plink2_convert:
     input:
-        'gwas/chip.beagle.{chrom}.vcf.gz'
+        'gwas/chip.beagle.{chrom}.normed.vcf.gz'
     output:
         'gwas/chip.beagle.{chrom}.bim'
     params:
-        out = lambda wildcards, output: PurePath(output[0]).with_suffix('')
+        out = lambda wildcards, output: PurePath(output[0]).with_suffix(''),
+        mem = lambda wildcards, threads, resources: int(threads*resources.mem_mb)
     threads: 4
     resources:
-        mem_mb = 2000
+        mem_mb = 15000
     shell:
         '''
-        plink2 --vcf {input} --chr-set 30 --make-bed --memory 8000 --threads {threads} --out {params.out} 
+        plink2 --vcf {input} --chr-set 30 --make-bed --memory {params.mem} --threads {threads} --out {params.out} 
         '''
 
 rule gcta_make_grm:
@@ -97,23 +99,28 @@ rule gcta_make_grm:
     params:
         _input = lambda wildcards, input: PurePath(input[0]).with_suffix(''),
         _output = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
+    threads: 8
+    resources:
+        mem_mb = 6000
     shell:
         '''
-        gcta --thread-num {threads} --autosome-num 29 --make-grm --bfile {params._input} --maf {wildcards.MAF} --out {params._output}
+        gcta --thread-num {threads} --autosome-num 29 --make-grm --bfile {params._input} --maf .{wildcards.MAF} --out {params._output}
         '''
 
 rule gcta_mlma:
     input:
         bim = 'gwas/chip.beagle.{chrom}.bim',
         grm = 'gwas/chip.beagle.{chrom}.{MAF}.grm.bin',
-        phenotype = '/cluster/work/pausch/naveen/GWAS/GCTA/RESULT/fpr/all/sire/phenotypes.txt'
+        phenotype = 'fpr_sire.phen'#cluster/work/pausch/naveen/GWAS/GCTA/RESULT/fpr/all/sire/phenotypes.txt'
     output:
         'gwas/chip.beagle.{chrom}.{MAF}.mlma'
     params:
         bim = lambda wildcards, input: PurePath(input.bim).with_suffix(''),
         grm = lambda wildcards, input: PurePath(input.grm).with_suffix('').with_suffix(''),
         _output = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
-
+    threads: 12
+    resources:
+        mem_mb = 5000
     shell:
         '''
         gcta --thread-num {threads} --autosome-num 29 --mlma --bfile {params.bim} --grm {params.grm} --out {params._output} --pheno {input.phenotype}
@@ -162,8 +169,8 @@ rule normalise_vcf:
         disk_scratch = 50
     shell:
         '''
-        bcftools norm --threads {threads} -f {config[reference]} -m -any {input} | \
-        bcftools sort -T $TMPDIR - | \
+        bcftools norm --threads {threads} -f {config[reference]} -m -any {input} -Ou | \
+        bcftools sort -T $TMPDIR -Ou - | \
         bcftools annotate --threads {threads} --set-id '%CHROM\_%POS\_%TYPE\_%REF\_%ALT' -o {output} -
         tabix -fp vcf {output}
         '''
@@ -178,6 +185,13 @@ rule exclude_MAF:
         bcftools query -f '%ID\n' -i 'MAF<0.{wildcards.MAF}' {input} > {output}
         '''
 
+def get_pass(_pass,input):
+    if _pass == 'permutations':
+        return f'--permute {config["permutations"]}'
+    elif _pass == 'conditionals':
+        return f'--mapping {input.mapping}'
+    elif _pass == 'nominals':
+        return '--nominal 1.0'
 rule qtltools_parallel:
     input:
         vcf = 'resources/variants.normed.vcf.gz',
@@ -188,13 +202,13 @@ rule qtltools_parallel:
     output:
         merged = temp('{qtl}/{_pass}.{chunk}.{MAF}.txt')
     params:
-        _pass = lambda wildcards,input: f'--permute {config["permutations"]}' if wildcards._pass == 'permutations' else f'--mapping {input.mapping}',
+        _pass = lambda wildcards,input: get_pass(wildcards._pass,input),#f'--permute {config["permutations"]}' if wildcards._pass == 'permutations' else f'--mapping {input.mapping}',
         debug = '--silent' if 'debug' in config else '',
         grp = lambda wildcards: '--grp-best' if wildcards.qtl == 'sQTL' else ''
     threads: 1
     resources:
-        mem_mb = 1500,
-        walltime = lambda wildcards: '4:00' if wildcards._pass == 'permutations' else '30'
+        mem_mb = 12500,
+        walltime = lambda wildcards: '24:00' if wildcards._pass == 'permutations' else '4:00'
     shell:
         '''
         QTLtools cis --vcf {input.vcf} --bed {input.bed} --cov {input.cov} {params._pass} {params.grp} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --out {output} {params.debug}
@@ -235,7 +249,7 @@ rule qtltools_postprocess:
     output:
         '{qtl}/significant_hits.{minS}.{MAF}.fastman'
     params:
-        slices = lambda wildcards: '$9"\t"($11-$10)"\t"$10"\t"$8"\tN\teQTL\t2\t"$20"\t"$19"\t"$18' if wildcards.qtl == 'eQTL' else '$11"\t"($13-$12)"\t"$12"\t"$10"\tN\teQTL\t2\t"$22"\t"$21"\t"$20'
+        print_key = lambda wildcards: '$9"\t"($11-$10)"\t"$10"\t"$8"\tN\teQTL\t2\t"$20"\t"$19"\t"$18' if wildcards.qtl == 'eQTL' else '$11"\t"($13-$12)"\t"$12"\t"$10"\tN\teQTL\t2\t"$22"\t"$21"\t"$20'
     shell:
         '''
         echo "CHR\tsize\tBP\tSNP\tA1\tTEST\tNMISS\tBETA\tSTAT\tP" > {output}
