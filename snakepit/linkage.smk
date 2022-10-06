@@ -44,7 +44,7 @@ rule plink_make_bed:
     input:
         lambda wildcards: config['vcfs'][wildcards.vcf]
     output:
-        'LD/{vcf}.{chromosome}.bed'
+        'bfiles/{vcf}.{chromosome}.bim'
     params:
         bfile = lambda wildcards, output: PurePath(output[0]).with_suffix(''),
         memory = lambda wildcards, threads, resources: int(threads*resources.mem_mb)
