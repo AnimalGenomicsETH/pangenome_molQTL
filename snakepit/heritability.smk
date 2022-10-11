@@ -11,11 +11,13 @@ rule partition_IDs:
         lambda wildcards: config['vcfs'][wildcards.vcf]
     output:
         SV = 'bfiles/{vcf}.SV.ids',
-        small = 'bfiles/{vcf}.small.ids'
+        small = 'bfiles/{vcf}.small.ids',
+        _all = 'bfiles/{vcf}.all.ids'
     shell:
         '''
         bcftools query -i 'abs(ILEN)>=50' -f '%ID\n' {input} > {output.SV}
         bcftools query -e 'abs(ILEN)>=50' -f '%ID\n' {input} > {output.small}
+        cat {output.SV} {output.small} > {output._all}
         '''
 
 rule plink_make_bed:
@@ -110,4 +112,21 @@ rule gather_hsq:
 #awk '{if($1=="V(G1)/Vp"){a[FILENAME][1]=$2;a[FILENAME][2]=$3}else{if($1=="V(G2)/Vp"){a[FILENAME][3]=$2;a[FILENAME][4]=$3}else{if($3=="V(G)/Vp"){a[FILENAME][5]=$4;a[FILENAME][6]=$5}}}} END {for(F in a){print F,a[F][1],a[F][2],a[F][3],a[F][4],a[F][5],a[F][6]}}' GRM/molecular_phenotypes/*hsq | sed 's/GRM\/molecular_phenotypes\///g;s/\.hsq//g' > GRM/main.hsq
 
 
-        
+rule gcta_score:
+    input:
+        expand('bfiles/{{vcf}}.{chromosome}.{{variants}}.bim',chromosome=range(1,30))
+    output:
+        'GRM/{vcf}.{variants}.score.ld'
+    params:
+        _input = lambda wildcards, input: '\\n'.join([str(PurePath(I).with_suffix('')) for I in input]),
+        _output = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
+    threads: 8
+    resources:
+        mem_mb = 6000
+    output:
+        ''
+    shell:
+        '''
+        echo -e "{params._input}" > $TMPDIR/mbfile
+        gcta --mbfile $TMPDIR/mbfile --ld-score-region 200 --out {params._output} --thread-num {threads} --autosome-num 30
+        '''
