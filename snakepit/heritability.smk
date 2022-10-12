@@ -10,9 +10,9 @@ rule partition_IDs:
     input:
         lambda wildcards: config['vcfs'][wildcards.vcf]
     output:
-        SV = 'bfiles/{vcf}.SV.ids',
-        small = 'bfiles/{vcf}.small.ids',
-        _all = 'bfiles/{vcf}.all.ids'
+        SV = 'GRM/{vcf}.SV.ids',
+        small = 'GRM/{vcf}.small.ids',
+        _all = 'GRM/{vcf}.all.ids'
     shell:
         '''
         bcftools query -i 'abs(ILEN)>=50' -f '%ID\n' {input} > {output.SV}
@@ -22,10 +22,9 @@ rule partition_IDs:
 
 rule plink_make_bed:
     input:
-        vcf = lambda wildcards: config['vcfs'][wildcards.vcf],
-        ids = 'bfiles/{vcf}.{variants}.ids'
+        vcf = lambda wildcards: config['vcfs'][wildcards.vcf]
     output:
-        'bfiles/{vcf}.{chromosome}.{variants}.bim'
+        'bfiles/{vcf}.{chromosome}.bim'
     params:
         bfile = lambda wildcards, output: PurePath(output[0]).with_suffix(''),
         memory = lambda wildcards, threads, resources: int(threads*resources.mem_mb)
@@ -35,16 +34,17 @@ rule plink_make_bed:
         walltime = '15'
     shell:
         '''
-        plink2 --native --vcf {input.vcf} --threads {threads} --extract {input.ids} --memory {params.memory} --maf 0.01:minor --cow --make-bed --chr {wildcards.chromosome} --out {params.bfile}
+        plink2 --native --vcf {input.vcf} --threads {threads} --memory {params.memory} --maf 0.01:minor --cow --make-bed --chr {wildcards.chromosome} --out {params.bfile}
         '''
 
 rule gcta_grm:
     input:
-        expand('bfiles/{{vcf}}.{chromosome}.{{variants}}.bim',chromosome=range(1,30))
+        bfiles = expand('bfiles/{{vcf}}.{chromosome}.bim',chromosome=range(1,30)),
+        ids = 'GRM/{vcf}.{variants}.ids' 
     output:
         'GRM/{vcf}.{variants}.grm.bin'
     params:
-        _input = lambda wildcards, input: '\\n'.join([str(PurePath(I).with_suffix('')) for I in input]),
+        _input = lambda wildcards, input: '\\n'.join([str(PurePath(I).with_suffix('')) for I in input.bfiles]),
         _output = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
     threads: 8
     resources:
@@ -52,7 +52,7 @@ rule gcta_grm:
     shell:
         '''
         echo -e "{params._input}" > $TMPDIR/mbfile
-        gcta --thread-num {threads} --autosome-num 30 --make-grm-bin --mbfile $TMPDIR/mbfile --out {params._output}
+        gcta --thread-num {threads} --autosome-num 30 --extract {input.ids} --make-grm-bin --mbfile $TMPDIR/mbfile --out {params._output}
         '''
 
 localrules: prep_covars
@@ -114,19 +114,32 @@ rule gather_hsq:
 
 rule gcta_score:
     input:
-        expand('bfiles/{{vcf}}.{chromosome}.{{variants}}.bim',chromosome=range(1,30))
+        expand('bfiles/{{vcf}}.{chromosome}.bim',chromosome=range(1,30))
     output:
-        'GRM/{vcf}.{variants}.score.ld'
+        'GRM/{vcf}.score.ld'
     params:
         _input = lambda wildcards, input: '\\n'.join([str(PurePath(I).with_suffix('')) for I in input]),
         _output = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
-    threads: 8
+    threads: 24
     resources:
-        mem_mb = 6000
+        mem_mb = 3000,
+        walltime = '24:00'
     output:
         ''
     shell:
         '''
         echo -e "{params._input}" > $TMPDIR/mbfile
-        gcta --mbfile $TMPDIR/mbfile --ld-score-region 200 --out {params._output} --thread-num {threads} --autosome-num 30
+        gcta --mbfile $TMPDIR/mbfile --ld-score-region 200 --ld-wind 1000 --out {params._output} --thread-num {threads} --autosome-num 30
+        '''
+
+rule gcta_stratify:
+    input:
+        'GRM/{vcf}.score.ld'
+    output:
+        expand('GRM/{{vcf}}.LD_group{N}.ids',N=range(1,5))
+    params:
+        _output = lambda wildcards, output: str(PurePath(output[0]).parent)
+    shell:
+        '''
+        Rscript --vanilla {workflow.basedir}/LD_stratify.R {input} {params._output}
         '''
