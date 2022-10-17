@@ -192,6 +192,30 @@ def get_pass(_pass,input):
         return f'--mapping {input.mapping}'
     elif _pass == 'nominals':
         return '--nominal 1.0'
+
+rule qtltools_pca:
+    input:
+        vcf = 'resources/variants.normed.vcf.gz',
+        exclude = 'resources/exclude_sites.{MAF}.txt',
+        bed = lambda wildcards: config['genes'][wildcards.qtl],
+        cov = lambda wildcards: config['covariates'][wildcards.qtl],
+    output:
+        pca = ''
+    shell:
+        '''
+        QTLtools pca --bed resources/aligned_genes.117.sorted.bed.gz --out testpca --center --scale
+        '''
+
+import numpy as np
+def elbow_method(PC_variances):
+    #any trimming
+    points = np.vstack([range(1,len(variances)+1),variances]).T
+    
+    def distance_to_line(p1,p2,p3):
+        return np.abs(np.cross(p2-p1, p1-p3)) / np.linalg.norm(p2-p1)
+
+    return np.argmax(distance_to_line(points[0],points[-1],points))
+
 rule qtltools_parallel:
     input:
         vcf = 'resources/variants.normed.vcf.gz',
