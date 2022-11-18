@@ -23,7 +23,7 @@ rule fastp:
 rule jellyfish_count:
     input:
         lambda wildcards: get_sample_location(wildcards.sample),
-        paths = 'pangenie.2772146623768787664.path_segments.fasta'
+        pangenie_index = rules.pangenie_index.output[0]
     output:
         temp(get_dir('fastq','{sample}.jf'))
     threads: 6
@@ -31,7 +31,7 @@ rule jellyfish_count:
         mem_mb = 8000
     shell:
         '''
-        fastp -w {threads} -i {input[0]} -I {input[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | jellyfish count -L 1 -U 10000 -m 31 -s 3000000000 -p 126 -c 7 -C -t {threads} --if {input.paths} -o {output} /dev/fd/0
+        fastp -w {threads} -i {input[0]} -I {input[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | jellyfish count -L 1 -U 10000 -m 31 -s 3000000000 -p 126 -c 7 -C -t {threads} --if {input.pangenie_index} -o {output} /dev/fd/0
         '''
 
 rule pangenie:
@@ -58,42 +58,37 @@ rule pangenie:
         PanGenie -i $TMPDIR/{wildcards.sample}.fastq -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
         '''
 
-rule pangenie_cereal:
+rule pangenie_index:
     input:
         reference = config['reference'],
         vcf = config['panel']
     output:
-        'pangenie.2772146623768787664.path_segments.fasta' #how to get the hash name?
+        'pangenie.cereal'
     threads: 6
     resources:
         mem_mb = 10000
     shell:
         '''
-        /cluster/work/pausch/alex/software/Alex-pangenie/build/src/PanGenie -B -i /dev/null -r {input.reference} -v {input.vcf} -t {threads}
-        touch {output}
+        pangenie -B {output} -i /dev/null -r {input.reference} -v {input.vcf} -t {threads}
         '''
 
-rule direct_pangenie:
+rule pangenie_genotype:
     input:
         reference = config['reference'],
-        vcf = config['panel'],
-        fastq = lambda wildcards: get_sample_location(wildcards.sample),
-        paths = 'pangenie.11499423960070264872.path_segments.fasta'
+        jellyfish = rules.jellyfish_count.output[0],
+        pangenie_index = rules.pangenie_index.output[0]
     output:
         get_dir('PG','{sample}.all.pangenie_genotyping.vcf')
-        #temp(multiext(get_dir('PG','{sample}.all.pangenie_'),'genotyping.vcf','histogram.histo'))
     params:
         prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_genotyping','')
-        #phasing = lambda wildcards: '-p' if wildcards.pangenie_mode == 'phasing' else ''
     threads: 8
     resources:
         mem_mb = 13000,
-        disk_scratch = 75,
-        walltime = '24:00'
+        scratch = '75G',
+        walltime = '4:00'
     shell:
         '''
-        fastp -w {threads} -i {input.fastq[0]} -I {input.fastq[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | jellyfish count -L 1 -U 10000 -m 31 -s 3000000000 -p 126 -c 7 -C -t {threads} --if {input.paths} -o $TMPDIR/{wildcards.sample}.jf /dev/fd/0
-        /cluster/work/pausch/alex/software/Alex-pangenie/build/src/PanGenie -i $TMPDIR/{wildcards.sample}.jf -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
+        pangenie -i {input.jellyfish} -r {input.reference} -v {input.pangenie_index} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
         '''
 
 rule bgzip_tabix:
