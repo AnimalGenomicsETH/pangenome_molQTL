@@ -9,9 +9,9 @@ class Default(dict):
 
 def get_dir(base,ext='',**kwargs):
     if base == 'SV':
-        base_dir = list(config['assemblies'].keys())[0] + '_run_{run}'
+        base_dir = ''#list(config['assemblies'].keys())[0] + '_run_{run}'
     elif base == 'VG':
-        base_dir = list(config['assemblies'].keys())[0] + '_run_{run}_VG'
+        base_dir = '' #list(config['assemblies'].keys())[0] + '_run_{run}_VG'
     elif base == 'PG':
         base_dir = 'pangenie'
     elif base == 'fastq':
@@ -25,7 +25,7 @@ def get_dir(base,ext='',**kwargs):
     elif base == 'igv':
         base_dir = 'IGV'
     else:
-        raise Exception('Base not found')
+        raise Exception(f'{base=} not found')
     if ext and ext[0] == '.':
         return f'{base_dir}{ext}'.format_map(Default(kwargs))
     return str(PurePath(base_dir.format_map(Default(kwargs))) / ext.format_map(Default(kwargs)))
@@ -34,9 +34,9 @@ wildcard_constraints:
     L = r'\d+'
 
 include: 'pangenie.smk'
-include: 'pbsv.smk'
-include: 'igv_validate.smk'
-include: 'plink2.smk'
+#include: 'pbsv.smk'
+#include: 'igv_validate.smk'
+#include: 'plink2.smk'
 
 def capture_logic():
     targets = []
