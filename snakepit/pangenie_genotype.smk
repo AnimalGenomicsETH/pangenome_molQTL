@@ -20,10 +20,26 @@ rule fastp:
         fastp -w {threads} -i {input[0]} -I {input[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | pigz -p {threads} - > {output}
         '''
 
+rule pangenie_index:
+    input:
+        reference = config['reference'],
+        vcf = config['panel']
+    output:
+        multiext('pangenie','.cereal','.path_segments.fasta')
+    params:
+        prefix = lambda wildcards, output: PurePath(output[0]).with_suffix('')
+    threads: 1
+    resources:
+        mem_mb = 15000
+    shell:
+        '''
+        pangenie -B {params.prefix} -i /dev/null -r {input.reference} -v {input.vcf} -t {threads}
+        '''
+
 rule jellyfish_count:
     input:
         lambda wildcards: get_sample_location(wildcards.sample),
-        pangenie_index = rules.pangenie_index.output[0]
+        pangenie_index = rules.pangenie_index.output[1]
     output:
         temp(get_dir('fastq','{sample}.jf'))
     threads: 6
@@ -58,29 +74,16 @@ rule pangenie:
         PanGenie -i $TMPDIR/{wildcards.sample}.fastq -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
         '''
 
-rule pangenie_index:
-    input:
-        reference = config['reference'],
-        vcf = config['panel']
-    output:
-        'pangenie.cereal'
-    threads: 6
-    resources:
-        mem_mb = 10000
-    shell:
-        '''
-        pangenie -B {output} -i /dev/null -r {input.reference} -v {input.vcf} -t {threads}
-        '''
-
 rule pangenie_genotype:
     input:
         reference = config['reference'],
         jellyfish = rules.jellyfish_count.output[0],
-        pangenie_index = rules.pangenie_index.output[0]
+        pangenie_index = rules.pangenie_index.output
     output:
         get_dir('PG','{sample}.all.pangenie_genotyping.vcf')
     params:
-        prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_genotyping','')
+        prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_genotyping',''),
+        index = lambda wildcards, input: PurePath(input.pangenie_index[0]).with_suffix('')
     threads: 8
     resources:
         mem_mb = 13000,
@@ -88,7 +91,7 @@ rule pangenie_genotype:
         walltime = '4:00'
     shell:
         '''
-        pangenie -i {input.jellyfish} -r {input.reference} -v {input.pangenie_index} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
+        pangenie -i {input.jellyfish} -r {input.reference} -v {params.index} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
         '''
 
 rule bgzip_tabix:

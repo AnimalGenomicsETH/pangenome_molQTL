@@ -314,7 +314,7 @@ rule merge_haplotypes:
         walltime = '4:00'
     shell:
         """
-        python3 {mscripts}/merge_vcfs.py merge -vcf {input.vcf} -r {input.reference} -ploidy 2 -chromosomes {wildcards.chr} -max_edit_distance 0.01 > {output.tmp}
+        python3 {mscripts}/merge_vcfs.py merge -vcf {input.vcf} -r {input.reference} -ploidy 2 -chromosomes {wildcards.chr} -max_edit_distance 0.02 > {output.tmp}
         """
 
 #############################################
