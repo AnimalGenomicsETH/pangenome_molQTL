@@ -36,6 +36,19 @@ rule pangenie_index:
         pangenie -B {params.prefix} -i /dev/null -r {input.reference} -v {input.vcf} -t {threads}
         '''
 
+rule jellyfish_count_index:
+    input:
+        rules.pangenie_index.output[1]
+    output:
+        'pangenie.jf'
+    threads: 4
+    resources:
+        mem_mb = 7000
+    shell:
+        '''
+        jellyfish count -L 1 -U 10000 -m 31 -s 3000000000 -p 126 -c 7 -C -t {threads} -o {output} {input}
+        '''
+
 rule jellyfish_count:
     input:
         lambda wildcards: get_sample_location(wildcards.sample),
@@ -71,27 +84,28 @@ rule pangenie:
     shell:
         '''
         pigz -p {threads} -c -d {input.fastq} > $TMPDIR/{wildcards.sample}.fastq
-        PanGenie -i $TMPDIR/{wildcards.sample}.fastq -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
+        PanGenie -i {input} -r {input.reference} -v {input.vcf} -t {threads} -j {threads} -s {wildcards.sample} -g {params.phasing} -o {params.prefix}
         '''
 
 rule pangenie_genotype:
     input:
         reference = config['reference'],
-        jellyfish = rules.jellyfish_count.output[0],
+        fastq = lambda wildcards: get_sample_location(wildcards.sample),
         pangenie_index = rules.pangenie_index.output
     output:
         get_dir('PG','{sample}.all.pangenie_genotyping.vcf')
     params:
         prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_genotyping',''),
         index = lambda wildcards, input: PurePath(input.pangenie_index[0]).with_suffix('')
-    threads: 8
+    threads: 12
     resources:
-        mem_mb = 13000,
+        mem_mb = 8000,
         scratch = '75G',
         walltime = '4:00'
     shell:
         '''
-        pangenie -i {input.jellyfish} -r {input.reference} -v {params.index} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
+        fastp -w {threads} -i {input.fastq[0]} -I {input.fastq[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | seqtk seq -A > $TMPDIR/reads.fa
+        pangenie -i $TMPDIR/reads.fa -r {input.reference} -v {params.index} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
         '''
 
 rule bgzip_tabix:
