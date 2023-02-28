@@ -13,7 +13,7 @@ def get_dir(base,ext='',**kwargs):
     elif base == 'VG':
         base_dir = '' #list(config['assemblies'].keys())[0] + '_run_{run}_VG'
     elif base == 'PG':
-        base_dir = 'pangenie'
+        base_dir = 'pangenie_8_sample'
     elif base == 'fastq':
         base_dir = '/cluster/scratch/alleonard'
     elif base == 'main':
@@ -33,7 +33,7 @@ def get_dir(base,ext='',**kwargs):
 wildcard_constraints:
     L = r'\d+'
 
-include: 'pangenie.smk'
+include: 'pangenie_genotype.smk'
 #include: 'pbsv.smk'
 #include: 'igv_validate.smk'
 #include: 'plink2.smk'
