@@ -77,7 +77,7 @@ rule pangenie:
     resources:
         mem_mb = 12500,
         disk_scratch = 120,
-        walltime = '24:00'
+        walltime = '24h'
     envmodules:
         'gcc/8.2.0',
         'pigz/2.4'
@@ -101,7 +101,7 @@ rule pangenie_genotype:
     resources:
         mem_mb = 8000,
         scratch = '75G',
-        walltime = '4:00'
+        walltime = '4h'
     shell:
         '''
         fastp -w {threads} -i {input.fastq[0]} -I {input.fastq[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | seqtk seq -A > $TMPDIR/reads.fa
@@ -150,9 +150,30 @@ rule extract_SVs:
         bcftools view --threads {threads} -i 'abs(ILEN)>50' -o {output} {input}
         '''
 
+rule beagle5_impute:
+    input:
+        '/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.vcf.gz'
+    output:
+        '/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.imputed.vcf.gz'
+    params:
+        prefix = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix(''),
+        name = lambda wildcards, output: PurePath(output[0]).name
+    threads: 24
+    resources:
+        mem_mb = 5000,
+        walltime = '24h'
+    shell:
+        '''
+        java -jar -Xss25m -Xmx95G /cluster/work/pausch/alex/software/beagle.22Jul22.46e.jar gt={input} nthreads={threads} out={params.prefix}
+        mv {output[0]} $TMPDIR/{params.name}
+        bcftools reheader -f {config[reference]}.fai -o {output[0]} $TMPDIR/{params.name}
+        tabix -fp vcf {output[0]}
+        '''
+
+
 rule merge_with_population_SR:
     input:
-        DV = config['DV-SR'],
+        DV = rules.beagle5_impute.output,#config['DV-SR'],
         pangenie = get_dir('PG','samples.all.pangenie_{pangenie_mode}.vcf.gz')
     output:
         get_dir('PG','samples.all.pangenie_{pangenie_mode}_DV.vcf.gz')
@@ -160,16 +181,16 @@ rule merge_with_population_SR:
     resources:
         mem_mb = 2500,
         disk_scratch = 75,
-        walltime = '24:00'
+        walltime = '24h'
     shell:
         '''
-        bcftools concat -a -D --threads {threads} -Ou {input}| \
-        bcftools view -e 'FILTER="MONOALLELIC"' -Ou - | \
+        bcftools concat -a -D --threads {threads} {input}| \
+        grep -v "MONOALLELIC" |\
         bcftools norm --threads {threads} -f {config[reference]} -m -any -Ou - | \
         bcftools norm --threads {threads} -f {config[reference]} -d none -Ou - | \
         bcftools norm --threads {threads} -f {config[reference]} -m +any -Ou - | \
         bcftools sort -T $TMPDIR -Ou - | \
-        bcftools annotate --threads {threads} --set-id '%CHROM\_%POS\_%REF\_%ALT' -o {output} -
+        bcftools annotate --threads {threads} --set-id '%CHROM\_%POS\_%TYPE\_%REF\_%ALT' -o {output} -
         '''
 
 rule compare_pangenie:
