@@ -10,15 +10,15 @@ wildcard_constraints:
 
 rule all:
     input:
-        expand('QTL/eQTL/Testis_{variants}/conditionals.01.txt',variants=config['variants'])
+        expand('QTL/sQTL/Testis_{variants}/conditionals.01.txt',variants=config['variants'])
 
 localrules: concat_genes
 rule concat_genes:
     input:
-        lambda wildcards: expand('/cluster/work/pausch/xena/eQTL/gene_counts/{tissue_code}/QTLtools/{chromosome}_gene_counts.gz',chromosome=range(1,30),tissue_code={'Testis':'testis','Epididymis_head':'epi_h','Vas_deferens':'vas_d'}[wildcards.tissue])
+        lambda wildcards: expand('/cluster/work/pausch/xena/eQTL/gene_counts/{tissue_code}/QTLtools/{chromosome}_gene_counts.gz',chromosome=range(1,30),tissue_code={'Testis':'testis','Epididymis_head':'epi_h','Vas_deferens':'vas_d'}[wildcards.tissue]) if wildcards.QTL=='eQTL' else expand('/cluster/work/pausch/xena/eQTL/sQTL/{tissue_code}/removed/phenotypes/leafcutter.clus.{chromosome}.bed.gz',chromosome=range(1,30),tissue_code={'Testis':'testis','Epididymis_head':'epi_h','Vas_deferens':'vas_d'}[wildcards.tissue])
     output:
-        'aligned_genes/{tissue}.bed.gz',
-        'aligned_genes/{tissue}.bed.gz.tbi' 
+        'aligned_genes/{QTL}.{tissue}.bed.gz',
+        'aligned_genes/{QTL}.{tissue}.bed.gz.tbi' 
     shell:
         '''
         zcat {input} | sort -u -k1,1n -k2,2n | bgzip -@ 2 -c > {output[0]}
@@ -66,9 +66,9 @@ rule qtltools_parallel:
         exclude = rules.exclude_MAF.output,
         bed = rules.concat_genes.output,
         cov = lambda wildcards: config['covariates']['eQTL'][wildcards.tissue],
-        mapping = lambda wildcards: 'QTL/eQTL/{tissue}_{variants}/permutations_all.{MAF}.thresholds.txt' if wildcards._pass == 'conditionals' else []
+        mapping = lambda wildcards: 'QTL/{QTL}/{tissue}_{variants}/permutations_all.{MAF}.thresholds.txt' if wildcards._pass == 'conditionals' else []
     output:
-        merged = temp('QTL/eQTL/{tissue}_{variants}/{_pass}.{chunk}.{MAF}.txt')
+        merged = temp('QTL/{QTL}/{tissue}_{variants}/{_pass}.{chunk}.{MAF}.txt')
     params:
         _pass = lambda wildcards,input: get_pass(wildcards._pass,input),#f'--permute {config["permutations"]}' if wildcards._pass == 'permutations' else f'--mapping {input.mapping}',
         debug = '--silent' if 'debug' in config else '',
@@ -88,7 +88,7 @@ rule qtltools_gather:
     input:
         expand(rules.qtltools_parallel.output,chunk=range(0,config['chunks']+1),allow_missing=True)
     output:
-        'QTL/eQTL/{tissue}_{variants}/{_pass}.{MAF}.txt'
+        'QTL/{QTL}/{tissue}_{variants}/{_pass}.{MAF}.txt'
     resources:
         mem_mb = 3000,
         walltime = '20'
@@ -103,7 +103,7 @@ rule qtltools_FDR:
     input:
         expand(rules.qtltools_gather.output,_pass='permutations',allow_missing=True)
     output:
-        'QTL/eQTL/{tissue}_{variants}/permutations_all.{MAF}.thresholds.txt'
+        'QTL/{QTL}/{tissue}_{variants}/permutations_all.{MAF}.thresholds.txt'
     params:
         out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
     envmodules:
