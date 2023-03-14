@@ -10,7 +10,7 @@ wildcard_constraints:
 
 rule all:
     input:
-        expand('QTL/sQTL/Testis_{variants}/conditionals.01.txt',variants=config['variants'])
+        expand('QTL/{QTL}/Testis_{variants}/conditionals.01.txt',QTL=('eQTL','sQTL'),variants=config['variants'])
 
 localrules: concat_genes
 rule concat_genes:
@@ -72,7 +72,7 @@ rule qtltools_parallel:
     params:
         _pass = lambda wildcards,input: get_pass(wildcards._pass,input),#f'--permute {config["permutations"]}' if wildcards._pass == 'permutations' else f'--mapping {input.mapping}',
         debug = '--silent' if 'debug' in config else '',
-        grp = lambda wildcards: '--grp-best' if wildcards.tissue == 'sQTL' else ''
+        grp = lambda wildcards: '--grp-best' if wildcards.QTL == 'sQTL' else ''
     threads: 1
     resources:
         mem_mb = 12500,
@@ -93,7 +93,7 @@ rule qtltools_gather:
         mem_mb = 3000,
         walltime = '20'
     params:
-        sort_key = lambda wildcards: '-k9,9n -k10,10n' if wildcards.tissue != 'eQTL' else '-k11,11n -k12,12n'
+        sort_key = lambda wildcards: '-k9,9n -k10,10n' if wildcards.QTL == 'eQTL' else '-k11,11n -k12,12n'
     shell:
         '''
         sort {params.sort_key} {input} > {output}
