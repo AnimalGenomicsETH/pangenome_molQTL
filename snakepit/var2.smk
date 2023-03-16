@@ -1,13 +1,14 @@
 rule all:
     input:
-        expand('variant_calling/{sample}.FORCE.sniffles.vcf.gz',sample=config['HiFi'])
+        expand('variant_calling/{sample}.denovo.sniffles.vcf.gz',sample=config['HiFi']),
+        'variant_calling/samples.denovo.sniffles.vcf.gz'
 
 rule sniffles_call:
     input:
-        bam = '/cluster/work/pausch/alex/CCS_eQTL_cohort/ARS/{sample}.mm2.cram'
+        bam = '/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/long-read_alignments/PacBio_CCS/eQTL/{sample}.mm2.cram'
     output:
-        vcf = temp('variant_calling/{sample}.sniffles.vcf.gz'),
-        snf = temp('variant_calling/{sample}.sniffles.snf')
+        vcf = temp('variant_calling/{sample}.denovo.sniffles.vcf.gz'),
+        snf = temp('variant_calling/{sample}.denovo.sniffles.snf')
     threads: 4
     resources:
         mem_mb = 2500
@@ -20,9 +21,9 @@ rule sniffles_call:
 
 rule sniffles_merge:
     input:
-        snfs = expand('variant_calling/{sample}.FORCE.sniffles.snf',sample=config['HiFi'])
+        snfs = expand('variant_calling/{sample}.{call}.sniffles.snf',sample=config['HiFi'],allow_missing=True)
     output:
-        vcf = 'variant_calling/samples.FORCE.sniffles.vcf.gz'
+        vcf = 'variant_calling/samples.{call}.sniffles.vcf.gz'
     threads: 2
     resources:
         mem_mb = 2500
@@ -36,9 +37,10 @@ rule sniffles_merge:
 rule sniffles_genotype:
     input:
         bam = '/cluster/work/pausch/alex/CCS_eQTL_cohort/ARS/{sample}.mm2.cram',
-        vcf = '/cluster/work/pausch/alex/eQTL_GWAS/SV_ACCURACY/pangenie.vcf'
+        vcf = lambda wildcards: '' if wildcards.call == 'denovo' else '/cluster/work/pausch/alex/eQTL_GWAS/SV_ACCURACY/genotyping.vcf.gz' #'/cluster/work/pausch/alex/eQTL_GWAS/SV_ACCURACY/pangenie.vcf'
     output:
-        vcf = temp('variant_calling/{sample}.FORCE.sniffles.vcf.gz'),
+        vcf = temp('variant_calling/{sample}.{call}.sniffles.vcf.gz')
+    params:
     threads: 4
     resources:
         mem_mb = 1500
