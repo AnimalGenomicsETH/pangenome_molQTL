@@ -47,7 +47,7 @@ def capture_logic():
     #for caller in ('mg',):#'vg'):
     #    targets.append(get_dir('VG',f'annotated.L50.{caller}.df',run='TEST'))
     targets.append(get_dir('PG','samples.all.pangenie_genotyping.vcf.gz'))
-
+    targets.append(get_dir('PG','samples.all.pangenie_genotyping_DV.vcf.gz'))
     #for sample in config['samples']:
     #    targets.append(get_dir('VG',f'{sample}.all.L50.mg.gaf',run='TEST'))
     #    targets.append(get_dir('PG',f'{sample}.all.L50.vg.gaf',run='TEST'))
