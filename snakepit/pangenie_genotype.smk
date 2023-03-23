@@ -20,10 +20,24 @@ rule fastp:
         fastp -w {threads} -i {input[0]} -I {input[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | pigz -p {threads} - > {output}
         '''
 
+rule vcfwave:
+    input:
+        vcf = config['panel']
+    output:
+        'pangenie_panel.vcfwave.vcf'
+    threads: 8
+    resources:
+        mem_mb = 1500,
+        walltime = '1h'
+    shell:
+        '''
+        vcfwave -t {threads} --quiet {input} > {output}
+        '''
+
 rule pangenie_index:
     input:
         reference = config['reference'],
-        vcf = config['panel']
+        vcf = rules.vcfwave.output #config['panel']
     output:
         multiext('pangenie','.cereal','.path_segments.fasta')
     params:
