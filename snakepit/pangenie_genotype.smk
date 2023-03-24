@@ -28,7 +28,7 @@ rule vcfwave:
     threads: 8
     resources:
         mem_mb = 1500,
-        walltime = '1h'
+        walltime = '120h'
     shell:
         '''
         vcfwave -t {threads} --quiet {input} > {output}
