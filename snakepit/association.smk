@@ -10,7 +10,7 @@ wildcard_constraints:
 
 rule all:
     input:
-        expand('QTL/{QTL}/Testis_{variants}/conditionals.01.txt',QTL=('eQTL','sQTL'),variants=config['variants'])
+        expand('QTL/{QTL}/Testis_{variants}/conditionals.01.txt.gz',QTL=('eQTL','sQTL'),variants=config['variants'])
 
 localrules: concat_genes
 rule concat_genes:
@@ -65,21 +65,21 @@ rule qtltools_parallel:
         vcf = rules.normalise_vcf.output,
         exclude = rules.exclude_MAF.output,
         bed = rules.concat_genes.output,
-        cov = lambda wildcards: config['covariates']['eQTL'][wildcards.tissue],
+        cov = lambda wildcards: config['covariates'][wildcards.QTL][wildcards.tissue],
         mapping = lambda wildcards: 'QTL/{QTL}/{tissue}_{variants}/permutations_all.{MAF}.thresholds.txt' if wildcards._pass == 'conditionals' else []
     output:
         merged = temp('QTL/{QTL}/{tissue}_{variants}/{_pass}.{chunk}.{MAF}.txt')
     params:
-        _pass = lambda wildcards,input: get_pass(wildcards._pass,input),#f'--permute {config["permutations"]}' if wildcards._pass == 'permutations' else f'--mapping {input.mapping}',
-        debug = '--silent' if 'debug' in config else '',
-        grp = lambda wildcards: '--grp-best' if wildcards.QTL == 'sQTL' else ''
+        _pass = lambda wildcards,input: get_pass(wildcards._pass,input),
+        grp = lambda wildcards: '--grp-best' if wildcards.QTL == 'sQTL' else '',
+        debug = '--silent' if 'debug' in config else ''
     threads: 1
     resources:
         mem_mb = 12500,
-        walltime = lambda wildcards: '24h' if wildcards._pass == 'permutationsX' else '4h'
+        walltime = '4h'
     shell:
         '''
-        QTLtools cis --vcf {input.vcf} --bed {input.bed} --cov {input.cov} {params._pass} {params.grp} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --out {output} {params.debug}
+        QTLtools cis --vcf {input.vcf} --bed {input.bed} --cov {input.cov} --std-err {params._pass} {params.grp} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --out {output} {params.debug}
         '''
 
 localrules: qtltools_gather
@@ -88,7 +88,7 @@ rule qtltools_gather:
     input:
         expand(rules.qtltools_parallel.output,chunk=range(0,config['chunks']+1),allow_missing=True)
     output:
-        'QTL/{QTL}/{tissue}_{variants}/{_pass}.{MAF}.txt'
+        'QTL/{QTL}/{tissue}_{variants}/{_pass}.{MAF}.txt.gz'
     resources:
         mem_mb = 3000,
         walltime = '20'
@@ -96,7 +96,7 @@ rule qtltools_gather:
         sort_key = lambda wildcards: '-k9,9n -k10,10n' if wildcards.QTL == 'eQTL' else '-k11,11n -k12,12n'
     shell:
         '''
-        sort {params.sort_key} {input} > {output}
+        LC_ALL=C; sort --parallel=2 {params.sort_key} {input} | pigz -p 2 -c > {output}
         '''
 
 rule qtltools_FDR:
