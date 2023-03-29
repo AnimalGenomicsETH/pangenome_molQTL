@@ -21,7 +21,7 @@ rule concat_genes:
         'aligned_genes/{QTL}.{tissue}.bed.gz.tbi' 
     shell:
         '''
-        zcat {input} | sort -u -k1,1n -k2,2n | bgzip -@ 2 -c > {output[0]}
+        zcat {input} | sort -k1,1n -k2,2n | uniq | bgzip -@ 2 -c > {output[0]}
         tabix -p bed {output[0]}
         '''
 
@@ -68,35 +68,30 @@ rule qtltools_parallel:
         cov = lambda wildcards: config['covariates'][wildcards.QTL][wildcards.tissue],
         mapping = lambda wildcards: 'QTL/{QTL}/{tissue}_{variants}/permutations_all.{MAF}.thresholds.txt' if wildcards._pass == 'conditionals' else []
     output:
-        merged = temp('QTL/{QTL}/{tissue}_{variants}/{_pass}.{chunk}.{MAF}.txt')
+        merged = temp('QTL/{QTL}/{tissue}_{variants}/{_pass}.{chunk}.{MAF}.txt.gz')
     params:
         _pass = lambda wildcards,input: get_pass(wildcards._pass,input),
-        grp = lambda wildcards: '--grp-best' if wildcards.QTL == 'sQTL' else '',
-        debug = '--silent' if 'debug' in config else ''
+        grp = lambda wildcards: '--grp-best' if wildcards.QTL == 'sQTL' else ''
     threads: 1
     resources:
         mem_mb = 12500,
         walltime = '4h'
     shell:
         '''
-        QTLtools cis --vcf {input.vcf} --bed {input.bed} --cov {input.cov} --std-err {params._pass} {params.grp} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --out {output} {params.debug}
+        QTLtools cis --vcf {input.vcf} --bed {input.bed} --cov {input.cov} --std-err {params._pass} {params.grp} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --silent --log /dev/stderr --out /dev/stdout | pigz -p 2 -c > {output}
         '''
-
-localrules: qtltools_gather
 
 rule qtltools_gather:
     input:
         expand(rules.qtltools_parallel.output,chunk=range(0,config['chunks']+1),allow_missing=True)
     output:
         'QTL/{QTL}/{tissue}_{variants}/{_pass}.{MAF}.txt.gz'
-    resources:
-        mem_mb = 3000,
-        walltime = '20'
     params:
         sort_key = lambda wildcards: '-k9,9n -k10,10n' if wildcards.QTL == 'eQTL' else '-k11,11n -k12,12n'
+    localrule: True
     shell:
         '''
-        LC_ALL=C; sort --parallel=2 {params.sort_key} {input} | pigz -p 2 -c > {output}
+        LC_ALL=C; pigz -p 2 -dc {input} | sort --parallel=2 {params.sort_key} | pigz -p 2 -c > {output}
         '''
 
 rule qtltools_FDR:
