@@ -89,10 +89,10 @@ rule split_vcf:
         lambda wildcards: get_variants(wildcards.variant,wildcards.caller)#input_dict[f'{wildcards.variant}_{wildcards.caller}']
         #lambda wildcards: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_8_wave/samples.all.pangenie_genotyping.vcf.gz' if wildcards.caller == 'PG' else '/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.imputed.vcf.gz'
     output:
-        multiext('{variant,SVs|SNPs}/{sample}.{caller}.vcf.gz','','.tbi')
+        multiext('{variant,SVs|SNPs}/{sample}.{caller,PG|DV|Sniffles}.vcf.gz','','.tbi')
     params:
         regions = ' '.join(map(str,range(1,30))),
-        SVs = lambda wildcards: "-i 'abs(ILEN)>=50 -e 'INFO/SVTYPE==\"BND\"'" if wildcards.variant == 'SV' else ''
+        SVs = lambda wildcards: {'SVs_Sniffles':"-i 'F_MISSING<0.2&&abs(ILEN)>=50&&INFO/SVTYPE!=\"BND\"'",'SVs_PG':"-i 'F_MISSING<0.2&&abs(ILEN)>=50'"}.get(f'{wildcards.variant}_{wildcards.caller}',"-i 'F_MISSING<0.2'")
     shell:
         '''
         bcftools view -c 1 -a {params.SVs} -s {wildcards.sample} -o {output[0]} {input} {params.regions}
@@ -101,8 +101,8 @@ rule split_vcf:
 
 rule bcftools_isec:
     input:
-        vcf_truth = expand(rules.split_vcf.output,caller='DV',allow_missing=True),
-        vcf_query = expand(rules.split_vcf.output,caller='PG',allow_missing=True)
+        vcf_truth = expand(rules.split_vcf.output,caller='DV',variant='SNPs',allow_missing=True),
+        vcf_query = expand(rules.split_vcf.output,caller='PG',variant='SNPs',allow_missing=True)
     output:
         'SNPs/{sample}.isec'
     shell:
@@ -167,20 +167,20 @@ rule jasmine:
         'jasmine'
     threads: 1
     resources:
-        mem_mb= 10000,
-        walltime= '4h',
+        mem_mb= 2500,
+        walltime = '30',
         scratch = '5G'
     shell:
         '''
         mkdir -p $TMPDIR/SVs
-        pigz -dc {input.vcf[0]} > $TMPDIR/{input.vcf[0]}
-        pigz -dc {input.vcf[1]} > $TMPDIR/{input.vcf[1]}
+        pigz -dc {input.vcfs[0]} > $TMPDIR/SVs/{wildcards.sample}.PG.vcf
+        pigz -dc {input.vcfs[1]} > $TMPDIR/SVs/{wildcards.sample}.Sniffles.vcf
 
         java -Xmx6048m -jar /cluster/work/pausch/alex/software/Jasmine/jasmine.jar \
-        --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR \
+        --comma_filelist file_list={params._input} threads={threads} out_file=/dev/stdout out_dir=$TMPDIR \
         genome_file={config[reference]} --pre_normalize --ignore_strand --allow_intrasample --normalize_type \
-        max_dist=1
-        sed -i '20i ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="">\\n##INFO=<ID=STRANDS,Number=1,Type=String,Description="">' {output}
+        max_dist_linear=1 max_dist=1000 |\
+        grep -hoP "SUPP_VEC=\K\d+" | awk ' {{ A[$1]+=1 }} END {{ print "{wildcards.sample}",A["01"],A["10"],A["11"] }}' > {output}
         '''
 
 rule gather_jasmine:
@@ -191,5 +191,5 @@ rule gather_jasmine:
     localrule: True
     shell:
         '''
-        grep -hoP "SUPP_VEC=\K\d+" {input} > {output}
+        {{ echo "sample Sniffles PG Mutual" ; cat {input} ; }} > {output}
         '''
