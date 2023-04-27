@@ -74,8 +74,8 @@ rule qtltools_parallel:
         grp = lambda wildcards: '--grp-best' if wildcards.QTL == 'sQTL' else ''
     threads: 1
     resources:
-        mem_mb = 12500,
-        walltime = '4h'
+        mem_mb = 2500,
+        #walltime = '4h'
     shell:
         '''
         QTLtools cis --vcf {input.vcf} --bed {input.bed} --cov {input.cov} --std-err {params._pass} {params.grp} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --silent --log /dev/stderr --out /dev/stdout | pigz -p 2 -c > {output}
@@ -107,4 +107,23 @@ rule qtltools_FDR:
     shell:
         '''
         Rscript /cluster/work/pausch/alex/software/qtltools/scripts/qtltools_runFDR_cis.R {input} 0.05 {params.out}
+        '''
+
+rule LD:
+    input:
+        'QTL/{variants}.vcf.gz'
+    output:
+        'QTL/{variants}.stats'
+    resources:
+        mem_mb = 5000
+    shell:
+        '''
+        bcftools annotate -x INFO/AF -o $TMPDIR/sample.vcf.gz {input}
+        tabix -p vcf $TMPDIR/sample.vcf.gz
+        bcftools view -i 'abs(ILEN)>=50' $TMPDIR/sample.vcf.gz |\
+        bcftools stats > {output}
+        #awk '/number of records:/ {{ print $6 }} >> {output}
+        bcftools +prune -m 0.6 -w 1Mb $TMPDIR/sample.vcf.gz |\
+        bcftools stats >> {output}
+        #awk '/number of records:/ {{ print $6 }} >> {output}
         '''
