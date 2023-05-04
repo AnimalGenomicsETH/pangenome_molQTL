@@ -49,7 +49,8 @@ rule exclude_MAF:
         'QTL/{variants}.exclude_sites.{MAF}.txt'
     shell:
         '''
-        bcftools query -f '%ID\n' -i 'MAF<0.{wildcards.MAF}' {input} > {output}
+        bcftools view --threads 2 -Q 0.{wildcards.MAF}:minor -Ou {input} |\
+        bcftools query -f '%ID\n'  - > {output}
         '''
 
 def get_pass(_pass,input):

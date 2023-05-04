@@ -92,10 +92,11 @@ rule split_vcf:
         multiext('{variant,SVs|SNPs}/{sample}.{caller,PG|DV|Sniffles}.vcf.gz','','.tbi')
     params:
         regions = ' '.join(map(str,range(1,30))),
-        SVs = lambda wildcards: {'SVs_Sniffles':"-i 'F_MISSING<0.2&&abs(ILEN)>=50&&INFO/SVTYPE!=\"BND\"'",'SVs_PG':"-i 'F_MISSING<0.2&&abs(ILEN)>=50'"}.get(f'{wildcards.variant}_{wildcards.caller}',"-i 'F_MISSING<0.2'")
+        SVs = lambda wildcards: {'SVs_Sniffles':"-i 'F_MISSING<0.2&&abs(ILEN)>=50&&INFO/SVTYPE!=\"BND\"'",'SVs_PG':"-i 'F_MISSING<0.2&&abs(ILEN)>=50'"}.get(f'{wildcards.variant}_{wildcards.caller}',"-i 'F_MISSING<0.2'"),
+        sample = lambda wildcards: f'-s {wildcards.sample}' if wildcards.sample != 'all' else ''
     shell:
         '''
-        bcftools view -c 1 -a {params.SVs} -s {wildcards.sample} -o {output[0]} {input} {params.regions}
+        bcftools view -c 1 -a {params.SVs} {params.sample} -o {output[0]} {input} {params.regions}
         tabix -p vcf {output[0]}
         '''
 
@@ -167,8 +168,8 @@ rule jasmine:
         'jasmine'
     threads: 1
     resources:
-        mem_mb= 2500,
-        walltime = '30',
+        mem_mb= 5000,
+        walltime = '60',
         scratch = '5G'
     shell:
         '''
@@ -178,9 +179,10 @@ rule jasmine:
 
         java -Xmx6048m -jar /cluster/work/pausch/alex/software/Jasmine/jasmine.jar \
         --comma_filelist file_list={params._input} threads={threads} out_file=/dev/stdout out_dir=$TMPDIR \
-        genome_file={config[reference]} --pre_normalize --ignore_strand --allow_intrasample --normalize_type \
-        max_dist_linear=1 max_dist=1000 |\
-        grep -hoP "SUPP_VEC=\K\d+" | awk ' {{ A[$1]+=1 }} END {{ print "{wildcards.sample}",A["01"],A["10"],A["11"] }}' > {output}
+        genome_file={config[reference]} --pre_normalize --ignore_strand --allow_intrasample --ignore_type \
+        max_dist_linear=1 max_dist=1000 > {output}
+        #|\
+                #grep -hoP "SUPP_VEC=\K\d+" | awk ' {{ A[$1]+=1 }} END {{ print "{wildcards.sample}",A["01"],A["10"],A["11"] }}' > {output}
         '''
 
 rule gather_jasmine:
