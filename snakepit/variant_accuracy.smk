@@ -74,7 +74,6 @@ rule bcftools_stuff:
         '''
 
 
-## SNPs
 def get_variants(variant,caller):
     input_dict = {
               'SNPs_PG':'/cluster/work/pausch/alex/eQTL_GWAS/pangenie_8_wave/samples.all.pangenie_genotyping.vcf.gz',
@@ -87,7 +86,6 @@ def get_variants(variant,caller):
 rule split_vcf:
     input:
         lambda wildcards: get_variants(wildcards.variant,wildcards.caller)#input_dict[f'{wildcards.variant}_{wildcards.caller}']
-        #lambda wildcards: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_8_wave/samples.all.pangenie_genotyping.vcf.gz' if wildcards.caller == 'PG' else '/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.imputed.vcf.gz'
     output:
         multiext('{variant,SVs|SNPs}/{sample}.{caller,PG|DV|Sniffles}.vcf.gz','','.tbi')
     params:
@@ -159,7 +157,7 @@ rule gather_SR_happy:
 
 rule jasmine:
     input:
-        vcfs = expand('SVs/{sample}.{caller}.vcf.gz',caller=('PG','Sniffles'),allow_missing=True)
+        vcfs = expand(rules.split_vcf.output,caller=('PG','Sniffles'),variant='SVs',allow_missing=True)
     output:
         'SVs/{sample}.jasmine.txt'
     params:
