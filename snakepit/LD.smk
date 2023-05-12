@@ -2,7 +2,7 @@ from pathlib import PurePath
 
 rule all:
     input:
-        'LD/samples.SV.6.tags.list'
+        expand('LD/samples.SV.{r2}.{window}.tags.list',r2=list(range(2,9))+[99],window=(50,1000))
 
 
 rule bcftools_annotate:
@@ -40,14 +40,15 @@ rule plink2_LD:
         nicer_variants = rules.bcftools_annotate.output['nice'],
         tags = rules.bcftools_query.output
     output:
-        'LD/samples.SV.{r2}.tags.list'
-    threads: 8
+        'LD/samples.SV.{r2}.{window}.tags.list'
+    threads: 4
     resources:
-        mem_mb = 3000
+        mem_mb = 5000,
+        walltime = '30m'
     params:
         mem = lambda wildcards, threads, resources: threads*resources.mem_mb,
         out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
     shell:
         '''
-        plink --vcf {input.vcf} --extract {input.nicer_variants} --show-tags {input.tags} --maf 0.01 --tag-r2 0.{wildcards.r2} --tag-kb 1000 --threads {threads} --memory {params.mem} --chr-set 30 --vcf-half-call h --list-all --out {params.out}
+        plink --vcf {input.vcf} --extract {input.nicer_variants} --show-tags {input.tags} --maf 0.01 --tag-r2 0.{wildcards.r2} --tag-kb {wildcards.window} --threads {threads} --memory {params.mem} --chr-set 30 --vcf-half-call h --list-all --out {params.out}
         '''
