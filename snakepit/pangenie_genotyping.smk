@@ -7,27 +7,11 @@ def get_sample_location(sample):
         fastqs.append(str(Path(f'{config["fastq"]}{sample}_R{R}.fastq.gz').resolve()))
     return fastqs
 
-rule fastp:
-    input:
-        lambda wildcards: get_sample_location(wildcards.sample)
-    output:
-        temp(get_dir('fastq','{sample}.fastq.gz'))
-    threads: 4
-    resources:
-        mem_mb = 6000
-    envmodules:
-        'gcc/8.2.0',
-        'pigz/2.4'
-    shell:
-        '''
-        fastp -w {threads} -i {input[0]} -I {input[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | pigz -p {threads} - > {output}
-        '''
-
 rule vcfwave:
     input:
-        vcf = lambda wildcards: config['panel'][wildcards.panel]
+        vcf = rules.normalize_vcf.output
     output:
-        'pangenie_{panel}.vcfwave.vcf'
+        'pangenie_panel.vcfwave.vcf'
     threads: 8
     resources:
         mem_mb = 1500,
@@ -40,9 +24,9 @@ rule vcfwave:
 rule pangenie_index:
     input:
         reference = config['reference'],
-        vcf = rules.vcfwave.output #config['panel']
+        vcf = rules.vcfwave.output
     output:
-        multiext('pangenie_{panel}','.cereal','.path_segments.fasta')
+        multiext('pangenie_panel','.cereal','.path_segments.fasta')
     params:
         prefix = lambda wildcards, output: PurePath(output[0]).with_suffix('')
     threads: 1
@@ -72,20 +56,6 @@ rule pangenie_genotype:
         '''
         fastp -w {threads} -i {input.fastq[0]} -I {input.fastq[1]} --stdout -g --thread {threads} --html /dev/null --json /dev/null --dont_eval_duplication | seqtk seq -A > $TMPDIR/reads.fa
         pangenie -i $TMPDIR/reads.fa -r {input.reference} -v {params.index} -t {threads} -j {threads} -s {wildcards.sample} -g -o {params.prefix}
-        '''
-
-rule bgzip_tabix:
-    input:
-        rules.pangenie_genotype.output
-    output:
-        temp(multiext('pangenie_{panel}/{sample}.all.pangenie_{pangenie_mode}.vcf.gz','','.tbi'))
-    threads: 2
-    resources:
-        mem_mb = 4000
-    shell:
-        '''
-        bgzip --threads {threads} -c {input} > {output[0]}
-        tabix -p vcf {output[0]}
         '''
 
 rule merge_pangenie:
@@ -140,7 +110,7 @@ rule beagle5_impute:
 
 rule merge_with_population_SR:
     input:
-        DV = rules.beagle5_impute.output,#config['DV-SR'],
+        DV = rules.beagle5_impute.output,
         pangenie = rules.merge_pangenie.output
     output:
         'pangenie_{panel}/samples.all.pangenie_{pangenie_mode}_DV.vcf.gz'
@@ -162,9 +132,9 @@ rule merge_with_population_SR:
 
 rule compare_pangenie:
     input:
-        pangenie = get_dir('PG','{sample}.all.pangenie_genotyping.vcf.gz')
+        pangenie = rules.merge_pangenie.output
     output:
-        get_dir('concordance','{sample}.genotype_concordance_summary_metrics')
+        'concordance/{sample}.genotype_concordance_summary_metrics'
     params:
         gc_out = lambda wildcards,output: PurePath(output[0]).parent / f'{wildcards.sample}'
     resources:

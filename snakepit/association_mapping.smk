@@ -7,18 +7,13 @@ wildcard_constraints:
     MAF = r'\d+',
     vcf = r'(eQTL|gwas)/\S+'
 
-
-rule all:
-    input:
-        expand('QTL/{QTL}/Testis_{variants}/conditionals.01.txt.gz',QTL=('eQTL','sQTL'),variants=config['variants'])
-
-localrules: concat_genes
 rule concat_genes:
     input:
         lambda wildcards: expand('/cluster/work/pausch/xena/eQTL/gene_counts/{tissue_code}/QTLtools/{chromosome}_gene_counts.gz',chromosome=range(1,30),tissue_code={'Testis':'testis','Epididymis_head':'epi_h','Vas_deferens':'vas_d'}[wildcards.tissue]) if wildcards.QTL=='eQTL' else expand('/cluster/work/pausch/xena/eQTL/sQTL/{tissue_code}/removed/phenotypes/leafcutter.clus.{chromosome}.bed.gz',chromosome=range(1,30),tissue_code={'Testis':'testis','Epididymis_head':'epi_h','Vas_deferens':'vas_d'}[wildcards.tissue])
     output:
         'aligned_genes/{QTL}.{tissue}.bed.gz',
         'aligned_genes/{QTL}.{tissue}.bed.gz.tbi' 
+    localrule: True
     shell:
         '''
         zcat {input} | sort -k1,1n -k2,2n | uniq | bgzip -@ 2 -c > {output[0]}
@@ -76,7 +71,6 @@ rule qtltools_parallel:
     threads: 1
     resources:
         mem_mb = 2500,
-        #walltime = '4h'
     shell:
         '''
         QTLtools cis --vcf {input.vcf} --bed {input.bed} --cov {input.cov} --std-err {params._pass} {params.grp} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --silent --log /dev/stderr --out /dev/stdout | pigz -p 2 -c > {output}

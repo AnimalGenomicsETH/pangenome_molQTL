@@ -29,16 +29,6 @@ frac_missing = config.get('frac_missing',0.2) # skip positions with more than th
 # paftools skips contig-alignments shorter than this threshold
 min_alignment_len = 50000
 
-rule all:
-    input:
-        outdir + "multisample-vcfs/graph-filtered.vcf",
-        #outdir + "multisample-vcfs/callset-filtered.vcf",
-        #expand(outdir + "calls/{sample}-hap{haplotype}.vcf",haplotype=(0,1),sample=samples),
-        #outdir + "statistics/vcftools-plots/indel-histogram.pdf",
-        #outdir + "statistics/vcfstats-stats.txt"
-
-
-
 ###########################################
 #		1) Alignment
 ###########################################
