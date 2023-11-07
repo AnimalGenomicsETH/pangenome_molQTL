@@ -28,7 +28,7 @@ DV-SR: '/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.
 
 ## Pangenie stuff
 panel: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_panel.vcfwave.vcf'
-fastq: '/cluster/work/pausch/alex/eQTL_GWAS/fastq/'
+fastq: ''
 
 pangenie_out: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_wave/samples.all.pangenie_genotyping.vcf.gz'
 
