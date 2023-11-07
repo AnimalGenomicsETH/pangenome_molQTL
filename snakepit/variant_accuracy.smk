@@ -5,10 +5,10 @@ workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).pare
 
 def get_variants(variant,caller):
     input_dict = {
-              'SNPs_PG':'/cluster/work/pausch/alex/eQTL_GWAS/pangenie_8_wave/samples.all.pangenie_genotyping.vcf.gz',
-              'SNPs_DV':'/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.imputed.vcf.gz',
-              'SVs_PG': '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_panel.vcfwave.vcf.gz',
-              'SVs_Sniffles': 'SVs/samples.denovo.sniffles.vcf.gz'
+              'SNPs_PG':'variant_calling/panel.small.vcf.gz',
+              'SNPs_DV':config['small_variants'],
+              'SVs_PG': 'variant_calling/panel.SV.vcf',
+              'SVs_Sniffles': 'variant_calling/samples.denovo.sniffles.vcf.gz'
               }
     return input_dict[f'{variant}_{caller}']
 
@@ -59,7 +59,7 @@ rule happy:
         others = temp(multiext('SNPs/{sample}','.bcf','.bcf.csi','.extended.csv','.roc.all.csv.gz','.runinfo.json'))
     params:
         _dir = lambda wildcards, output: PurePath(output.csv).with_suffix('').with_suffix('')
-    container: '/cluster/work/pausch/alex/software/images/hap.py_latest.sif'
+    container: 'docker://pkrusche/hap.py'
     threads: 2
     resources:
         mem_mb = 5000,
@@ -104,8 +104,7 @@ rule jasmine:
         pigz -dc {input.vcfs[0]} > $TMPDIR/SVs/{wildcards.sample}.PG.vcf
         pigz -dc {input.vcfs[1]} > $TMPDIR/SVs/{wildcards.sample}.Sniffles.vcf
 
-        java -Xmx6048m -jar /cluster/work/pausch/alex/software/Jasmine/jasmine.jar \
-        --comma_filelist file_list={params._input} threads={threads} out_file=/dev/stdout out_dir=$TMPDIR \
+        jasmine --comma_filelist file_list={params._input} threads={threads} out_file=/dev/stdout out_dir=$TMPDIR \
         genome_file={config[reference]} --pre_normalize --ignore_strand --allow_intrasample --ignore_type \
         max_dist_linear=1 max_dist=1000 > {output}
         #|\
