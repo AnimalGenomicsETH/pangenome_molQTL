@@ -60,7 +60,24 @@ rule bcftools_autosomes:
         bcftools view --threads {threads} -r {params.regions} -o {output} {input}
         '''
 
+rule bcftools_stuff:
+    input:
+        rules.bcftools_autosomes.output
+    output:
+        sizes = 'SVs/sizes.gz',
+        support = 'SVs/support.gz',
+        GTs = 'SVs/GTs.gz'
+    localrule: True
+    shell:
+        '''
+        bcftools query -e 'INFO/SVTYPE=="BND"' -f '%INFO/SVLEN\\n' {input} | pigz -p2 -c > {output.sizes}
+        bcftools query -e 'INFO/SVTYPE=="BND"' -f '%INFO/SUPP_VEC\\n' {input} | mawk ' {{ print gsub(1,2,$1) }} ' | pigz -p2 -c > {output.support}
+        bcftools query -e 'INFO/SVTYPE=="BND"' -f '[%GT ]\\n' {input} | sed 's"|" "g' | sed 's"/" "g' | sed 's/\./nan/g' | pigz -p2 -c > {output.GTs}
+        '''
+
 rule bcftools_split_panel:
+    input:
+        expand(rules.merge_pangenie.output,pangenie_mode='genotyping',allow_missing=True)
     output:
         SV = 'variant_calling/panel.SV.vcf',
         small = 'variant_calling/panel.small.vcf.gz'

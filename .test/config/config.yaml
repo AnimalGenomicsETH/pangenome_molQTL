@@ -35,8 +35,8 @@ HiFi:
 #pangenie_out: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_wave/samples.all.pangenie_genotyping.vcf.gz'
 
 ## Phasing and imputation
-beagle4: '/cluster/work/pausch/alex/software/beagle.27Jan18.7e1.jar'
-beagle5: '/cluster/work/pausch/alex/software/beagle.22Jul22.46e.jar'
+#beagle4: ''
+beagle5: ''
 window: 10000000
 overlap: 20000
 
@@ -52,11 +52,9 @@ samples:
 
 covariates:
   eQTL:
-    Testis: '/cluster/work/pausch/xena/eQTL/cis_all/testis/testis_covariates.txt'
+    Testis: 'eQTL.covar'
   sQTL:
-    Epi: '/cluster/work/pausch/xena/eQTL/sQTL/epi_h/removed/QTLtools/epi_sQTL_covariates.txt'
-    Testis: '/cluster/work/pausch/xena/eQTL/sQTL/testis/removed/QTLtools/sQTL_covariates_removed_testis.txt'
-    Vas_d: '/cluster/work/pausch/xena/eQTL/sQTL/vas_d/removed/QTLtools/sQTL_covariates_vas_d.txt'
+    Testis: 'sQTL.covar'
 
 permutations: 2500
 window: 1000000 #1 Mb
