@@ -15,4 +15,4 @@ jobs:
         uses: snakemake/snakemake-github-action@v1.25.1
         with:
           directory: '.test'
-          args: '--dryrun --configfile config/config.yaml'
+          args: '--dryrun --configfile .test/config/config.yaml'
