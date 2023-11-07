@@ -28,7 +28,7 @@ small_variants: DV.vcf.gz
 #panel: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_panel.vcfwave.vcf'
 fastq: ''
 
-HiFi:
+HiFi_samples:
   sample1: hifi_1.fq.gz
   sample2: hifi_2.fq.gz
 
@@ -55,6 +55,12 @@ covariates:
     Testis: 'eQTL.covar'
   sQTL:
     Testis: 'sQTL.covar'
+mol_QTLs:
+  eQTL:
+    Testis: 'eQTL.TPM'
+  sQTL:
+    Testis: 'sQTL.clusters'
+
 
 permutations: 2500
 window: 1000000 #1 Mb

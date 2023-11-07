@@ -1,78 +1,7 @@
 from pathlib import PurePath
 
 ## Add reference path for happy container
-workflow.singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
-
-rule all:
-    input:
-        #expand('SVs/{sample}.denovo.sniffles.vcf.gz',sample=config['samples']),
-        #'SVs/samples.denovo.sniffles.vcf.gz',
-        'SNPs/F1.csv',
-        'SNPs/isec.csv'
-
-rule sniffles_call:
-    input:
-        bam = lambda wildcards: config['SV_samples'][wildcards.sample]#'/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/long-read_alignments/PacBio_CCS/eQTL/{sample}.mm2.cram'
-    output:
-        vcf = temp(multiext('SVs/{sample}.denovo.sniffles.vcf.gz','','.tbi')),
-        snf = temp('SVs/{sample}.denovo.sniffles.snf')
-    threads: 4
-    resources:
-        mem_mb = 2500
-    conda:
-        'sniffles'
-    shell:
-        '''
-        sniffles --input {input.bam} --reference {config[reference]} --sample-id {wildcards.sample} --phase --minsvlen 50 --threads {threads} --vcf {output.vcf[0]} --snf {output.snf}
-        '''
-
-rule sniffles_merge:
-    input:
-        snfs = expand(rules.sniffles_call.output['snf'],sample=config['SV_samples'],allow_missing=True)
-    output:
-        vcf = multiext('SVs/samples.{call}.sniffles.vcf.gz','','.tbi')
-    threads: 2
-    resources:
-        mem_mb = 2500
-    conda:
-        'sniffles'
-    shell:
-        '''
-        sniffles --input {input.snfs} --reference {config[reference]} --threads {threads} --vcf {output.vcf[0]}
-        '''
-
-rule sniffles_genotype:
-    input:
-        bam = '/cluster/work/pausch/alex/CCS_eQTL_cohort/ARS/{sample}.mm2.cram',
-        vcf = lambda wildcards: '' if wildcards.call == 'denovo' else '/cluster/work/pausch/alex/eQTL_GWAS/SV_ACCURACY/genotyping.vcf.gz' #'/cluster/work/pausch/alex/eQTL_GWAS/SV_ACCURACY/pangenie.vcf'
-    output:
-        vcf = temp(multiext('SVs/{sample}.{call}.sniffles.vcf.gz','','.tbi'))
-    params:
-    threads: 4
-    resources:
-        mem_mb = 1500
-    conda:
-        'sniffles'
-    shell:
-        '''
-        sniffles --input {input.bam} --genotype-vcf {input.vcf} --reference {config[reference]} --sample-id {wildcards.sample} --minsvlen 50 --threads {threads} --vcf {output.vcf}
-        '''
-
-rule bcftools_stuff:
-    input:
-        'SVs/samples.denovo.sniffles.vcf.gz'
-    output:
-        sizes = 'SVs/sizes.gz',
-        support = 'SVs/support.gz',
-        GTs = 'SVs/GTs.gz'
-    localrule: True
-    shell:
-        '''
-        bcftools query -e 'INFO/SVTYPE=="BND"' -f '%INFO/SVLEN\\n' {input} | pigz -p2 -c > {output.sizes}
-        bcftools query -e 'INFO/SVTYPE=="BND"' -f '%INFO/SUPP_VEC\\n' {input} | mawk ' {{ print gsub(1,2,$1) }} ' | pigz -p2 -c > {output.support}
-        bcftools query -e 'INFO/SVTYPE=="BND"' -f '[%GT ]\\n' {input} | sed 's"|" "g' | sed 's"/" "g' | sed 's/\./nan/g' | pigz -p2 -c > {output.GTs}
-        '''
-
+workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
 
 def get_variants(variant,caller):
     input_dict = {
@@ -185,7 +114,7 @@ rule jasmine:
 
 rule gather_jasmine:
     input:
-        expand(rules.jasmine.output[0],sample=config['SV_samples'])
+        expand(rules.jasmine.output[0],sample=config['HiFi_samples'])
     output:
         'SVs/jasmine.csv'
     localrule: True

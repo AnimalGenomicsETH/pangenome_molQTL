@@ -7,19 +7,6 @@ wildcard_constraints:
     MAF = r'\d+',
     vcf = r'(eQTL|gwas)/\S+'
 
-rule concat_genes:
-    input:
-        lambda wildcards: expand('/cluster/work/pausch/xena/eQTL/gene_counts/{tissue_code}/QTLtools/{chromosome}_gene_counts.gz',chromosome=range(1,30),tissue_code={'Testis':'testis','Epididymis_head':'epi_h','Vas_deferens':'vas_d'}[wildcards.tissue]) if wildcards.QTL=='eQTL' else expand('/cluster/work/pausch/xena/eQTL/sQTL/{tissue_code}/removed/phenotypes/leafcutter.clus.{chromosome}.bed.gz',chromosome=range(1,30),tissue_code={'Testis':'testis','Epididymis_head':'epi_h','Vas_deferens':'vas_d'}[wildcards.tissue])
-    output:
-        'aligned_genes/{QTL}.{tissue}.bed.gz',
-        'aligned_genes/{QTL}.{tissue}.bed.gz.tbi' 
-    localrule: True
-    shell:
-        '''
-        zcat {input} | sort -k1,1n -k2,2n | uniq | bgzip -@ 2 -c > {output[0]}
-        tabix -p bed {output[0]}
-        '''
-
 rule normalise_vcf:
     input:
         lambda wildcards: expand(rules.merge_with_population_SR.output,pangenie_mode='genotyping',allow_missing=True) if wildcards.variants == 'PanGenie' else config['small_variants']
@@ -60,7 +47,7 @@ rule qtltools_parallel:
     input:
         vcf = rules.normalise_vcf.output,
         exclude = rules.exclude_MAF.output,
-        bed = rules.concat_genes.output,
+        bed = lambda wildcards: config['mol_QTLs'][wildcards.QTL][wildcards.tissue],
         cov = lambda wildcards: config['covariates'][wildcards.QTL][wildcards.tissue],
         mapping = lambda wildcards: 'QTL/{QTL}/{tissue}_{variants}/permutations_all.{MAF}.thresholds.txt' if wildcards._pass == 'conditionals' else []
     output:
@@ -101,7 +88,7 @@ rule qtltools_FDR:
         'r/4.2.2'
     shell:
         '''
-        Rscript /cluster/work/pausch/alex/software/qtltools/scripts/qtltools_runFDR_cis.R {input} 0.05 {params.out}
+        Rscript qtltools_runFDR_cis.R {input} 0.05 {params.out}
         '''
 
 rule LD:
