@@ -43,7 +43,7 @@ rule pangenie_genotype:
         fastq = lambda wildcards: get_sample_location(wildcards.sample),
         pangenie_index = rules.pangenie_index.output
     output:
-       'pangenie_{panel}/{sample}.all.pangenie_genotyping.vcf'
+       'pangenie_panel/{sample}.all.pangenie_genotyping.vcf'
     params:
         prefix = lambda wildcards, output: str(PurePath(output[0]).with_suffix('')).replace(f'_genotyping',''),
         index = lambda wildcards, input: PurePath(input.pangenie_index[0]).with_suffix('')
@@ -60,10 +60,10 @@ rule pangenie_genotype:
 
 rule merge_pangenie:
     input:
-       vcf = expand('pangenie_{panel}/{sample}.all.pangenie_{pangenie_mode}.vcf.gz',sample=config['samples'],allow_missing=True),
-       tbi = expand('pangenie_{panel}/{sample}.all.pangenie_{pangenie_mode}.vcf.gz.tbi',sample=config['samples'],allow_missing=True)
+       vcf = expand('pangenie_panel/{sample}.all.pangenie_{pangenie_mode}.vcf.gz',sample=config['samples'],allow_missing=True),
+       tbi = expand('pangenie_panel/{sample}.all.pangenie_{pangenie_mode}.vcf.gz.tbi',sample=config['samples'],allow_missing=True)
     output:
-        'pangenie_{panel}/samples.all.pangenie_{pangenie_mode}.vcf.gz'
+        'pangenie_panel/samples.all.pangenie_{pangenie_mode}.vcf.gz'
     threads: 4
     resources:
         mem_mb = 10000,
@@ -78,7 +78,7 @@ rule extract_SVs:
     input:
         rules.merge_pangenie.output
     output:
-        'pangenie_{panel}/samples.all.pangenie_{pangenie_mode}.SVs.vcf.gz'
+        'pangenie_panel/samples.all.pangenie_{pangenie_mode}.SVs.vcf.gz'
     threads: 2
     resources:
         mem_mb = 2500
@@ -87,33 +87,12 @@ rule extract_SVs:
         bcftools view --threads {threads} -i 'abs(ILEN)>50' -o {output} {input}
         '''
 
-rule beagle5_impute:
-    input:
-        '/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.vcf.gz'
-    output:
-        '/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.imputed.vcf.gz'
-    params:
-        prefix = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix(''),
-        name = lambda wildcards, output: PurePath(output[0]).name
-    threads: 24
-    resources:
-        mem_mb = 5000,
-        walltime = '24h'
-    shell:
-        '''
-        java -jar -Xss25m -Xmx95G /cluster/work/pausch/alex/software/beagle.22Jul22.46e.jar gt={input} nthreads={threads} out={params.prefix}
-        mv {output[0]} $TMPDIR/{params.name}
-        bcftools reheader -f {config[reference]}.fai -o {output[0]} $TMPDIR/{params.name}
-        tabix -fp vcf {output[0]}
-        '''
-
-
 rule merge_with_population_SR:
     input:
-        DV = rules.beagle5_impute.output,
+        DV = config['small_variants'],
         pangenie = rules.merge_pangenie.output
     output:
-        'pangenie_{panel}/samples.all.pangenie_{pangenie_mode}_DV.vcf.gz'
+        'pangenie_panel/samples.all.pangenie_{pangenie_mode}_DV.vcf.gz'
     threads: 8
     resources:
         mem_mb = 2500,

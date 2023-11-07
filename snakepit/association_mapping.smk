@@ -22,7 +22,7 @@ rule concat_genes:
 
 rule normalise_vcf:
     input:
-        lambda wildcards: config['variants'][wildcards.variants]
+        lambda wildcards: expand(rules.merge_with_population_SR.output,pangenie_mode='genotyping',allow_missing=True) if wildcards.variants == 'PanGenie' else config['small_variants']
     output:
         'QTL/{variants}.vcf.gz'
     threads: 4
