@@ -1,6 +1,6 @@
 rule minimap2_align:
     input:
-        lambda wildcards: config['HiFi'][wildcards.sample]
+        lambda wildcards: config['HiFi_samples'][wildcards.sample]
     output:
         bam = temp('alignments/{sample}.HiFi.bam'),
         csi = temp('alignments/{sample}.HiFi.bam.csi')
@@ -32,7 +32,7 @@ rule sniffles_call:
 
 rule sniffles_merge:
     input:
-        snfs = expand('variant_calling/{sample}.sniffles.snf',sample=config['HiFi'])
+        snfs = expand('variant_calling/{sample}.sniffles.snf',sample=config['HiFi_samples'])
     output:
         vcf = 'variant_calling/samples.sniffles.vcf.gz'
     threads: 2
@@ -118,23 +118,6 @@ rule jasmine_intersect:
         '''
 #jasmine --comma_filelist file_list=smoove_SV/All_filter_type.vcf,eQTL_GWAS/variants/variant_calling/panel.SV.vcf threads=1 out_file=SR_LR.vcf out_dir=$TMPDIR spec_reads=0 genome_file=REF_DATA/ARS-UCD1.2_Btau5.0.1Y.fa min_seq_id=0 --pre_normalize --ignore_strand --allow_intrasample max_dist_linear=1 --normalize_type --dup_to_ins
 #bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t0\t+\t%POS\t%INFO/END\t%INFO/SUPP_VEC\n' SR_LR.vcf | grep -vE "(INV|TRA)"  | sed s'/10$/50,200,50/g' | sed s'/11$/250,100,150/g' | sed s'/01$/50,20,250/g' >> SR_LR.bed 
-
-rule bcftools_isec:
-    input:
-        read = 'DV_small.vcf.gz',#'DV-{read}/cohort.autosomes.WGS.vcf.gz',
-        asm = 'variant_calling/panel.small.vcf.gz',
-        other = 'panel.raw.small.vcf.gz'
-    output:
-        isec = 'isec_{read}_{strictness}.txt',
-        _count = 'isec_{read}_{strictness}.count'
-    threads: 2
-    resources:
-        mem_mb = 3000
-    shell:
-        '''
-        bcftools isec --threads {threads} -n +1 -o {output.isec} -c {wildcards.strictness} {input}
-        cut -f 5 {output.isec} | sort | uniq -c > {output._count}
-        '''
 
 ## Assembly rules:
 rule minimap2_align_asm:
