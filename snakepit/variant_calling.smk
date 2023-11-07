@@ -1,9 +1,3 @@
-rule all:
-    input:
-        expand('variant_calling/samples.{V}.vcf.gz',V=('sniffles',)),
-        'DV-SR/cohort.autosomes.WGS.vcf.gz',
-        'DV-LR/cohort.autosomes.WGS.vcf.gz'
-
 rule minimap2_align:
     input:
         lambda wildcards: config['HiFi'][wildcards.sample]
@@ -71,7 +65,7 @@ rule bcftools_split_panel:
         SV = 'variant_calling/panel.SV.vcf',
         small = 'variant_calling/panel.small.vcf.gz'
     params:
-        SV_size = config['SV_size'],
+        SV_size = 50,#config['SV_size'],
         bcf = '$TMPDIR/normed.bcf'
     threads: 2
     resources:
@@ -79,7 +73,7 @@ rule bcftools_split_panel:
         disk_scratch = 10
     shell:
         '''
-        bcftools norm --threads {threads} -f {config[reference]} -m -any {config[panel]} -Ou {input} > {params.bcf}
+        bcftools norm --threads {threads} -f {config[reference]} -m -any -Ou {input} > {params.bcf}
         bcftools view -i 'abs(ILEN)>={params.SV_size}' -o {output.SV} {params.bcf}
         bcftools view -e 'abs(ILEN)>={params.SV_size}' -o {output.small} {params.bcf}
         tabix -fp vcf {output.small}
@@ -90,7 +84,8 @@ rule jasmine_intersect:
         read = 'variant_calling/samples.sniffles.autosomes.vcf',
         asm = 'variant_calling/panel.SV.vcf'
     output:
-        'jasmine.vcf'
+        'jasmine.vcf',
+        'jasmine_overlaps.txt'
     params:
         _input = lambda wildcards, input: ','.join(input)
     conda:
@@ -101,8 +96,8 @@ rule jasmine_intersect:
         disk_scratch = 5
     shell:
         '''
-        jasmine --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR spec_reads=0 genome_file={config[reference]} min_seq_id=.5 --pre_normalize --ignore_strand --allow_intrasample --normalize_type
-        grep -vE "SVTYPE=(INV|TRA)" jasmine.vcf | grep -oP "(SVLEN=-?\d*|SUPP_VEC=\d{2})" | sed 's/[A-Z,=,_]*//g'  | paste -s -d' \n' > jasmine_SV_lens.txt
+        jasmine --comma_filelist file_list={params._input} threads={threads} out_file={output[0]} out_dir=$TMPDIR spec_reads=0 genome_file={config[reference]} min_seq_id=.5 --pre_normalize --ignore_strand --allow_intrasample --normalize_type
+        grep -vE "SVTYPE=(INV|TRA)" {output[0]} | grep -oP "(SVLEN=-?\d*|SUPP_VEC=\d{{2}})" | sed 's/[A-Z,=,_]*//g'  | paste -s -d' \n' > {output[1]}
         '''
 #jasmine --comma_filelist file_list=smoove_SV/All_filter_type.vcf,eQTL_GWAS/variants/variant_calling/panel.SV.vcf threads=1 out_file=SR_LR.vcf out_dir=$TMPDIR spec_reads=0 genome_file=REF_DATA/ARS-UCD1.2_Btau5.0.1Y.fa min_seq_id=0 --pre_normalize --ignore_strand --allow_intrasample max_dist_linear=1 --normalize_type --dup_to_ins
 #bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t0\t+\t%POS\t%INFO/END\t%INFO/SUPP_VEC\n' SR_LR.vcf | grep -vE "(INV|TRA)"  | sed s'/10$/50,200,50/g' | sed s'/11$/250,100,150/g' | sed s'/01$/50,20,250/g' >> SR_LR.bed 
@@ -123,28 +118,6 @@ rule bcftools_isec:
         bcftools isec --threads {threads} -n +1 -o {output.isec} -c {wildcards.strictness} {input}
         cut -f 5 {output.isec} | sort | uniq -c > {output._count}
         '''
-
-### IMPORT DEEPVARIANT MODULES
-module DV_SR_calling:
-    snakefile:
-        '/cluster/work/pausch/alex/BSW_analysis/snakepit/deepvariant.smk'
-    config: config["DV-SR-workflow"]
-    prefix: 'DV-SR'
-
-use rule * from DV_SR_calling as DV_SR_*
-
-module DV_LR_calling:
-    snakefile:
-        '/cluster/work/pausch/alex/BSW_analysis/snakepit/deepvariant.smk'
-    config: config["DV-LR-workflow"]
-    prefix: 'DV-LR'
-
-use rule * from DV_LR_calling as DV_LR_*
-
-use rule deepvariant_make_examples from DV_LR_calling as DV_LR_deepvariant_make_examples with:
-    input:
-        ref = multiext(config['reference'],'','.fai'),
-        bam = multiext('alignments/{animal}.HiFi.bam','','.csi')
 
 ## Assembly rules:
 rule minimap2_align_asm:

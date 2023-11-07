@@ -1,5 +1,3 @@
-
-
 ## Pangenome panel
 reference: reference.fa
 
@@ -24,13 +22,17 @@ outdir: 'pangenie_panel/'
 frac_missing: .15
 
 ## Pangenome genotyping
-DV-SR: '/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.vcf.gz'
+small_variants: DV.vcf.gz
 
 ## Pangenie stuff
-panel: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_panel.vcfwave.vcf'
+#panel: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_panel.vcfwave.vcf'
 fastq: ''
 
-pangenie_out: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_wave/samples.all.pangenie_genotyping.vcf.gz'
+HiFi:
+  sample1: hifi_1.fq.gz
+  sample2: hifi_2.fq.gz
+
+#pangenie_out: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_wave/samples.all.pangenie_genotyping.vcf.gz'
 
 ## Phasing and imputation
 beagle4: '/cluster/work/pausch/alex/software/beagle.27Jan18.7e1.jar'
@@ -44,9 +46,9 @@ samples:
   - sample2
 
 ## molecular QTL mapping
-variants:
-  PanGenie: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_8_wave/samples.all.pangenie_genotyping_DV.vcf.gz'
-  SR: '/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.imputed.vcf.gz'
+#variants:
+#  PanGenie: '/cluster/work/pausch/alex/eQTL_GWAS/pangenie_8_wave/samples.all.pangenie_genotyping_DV.vcf.gz'
+#  SR: '/cluster/work/pausch/alex/eQTL_GWAS/variants/DV-SR/cohort.autosomes.WGS.imputed.vcf.gz'
 
 covariates:
   eQTL:
