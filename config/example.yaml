@@ -1,23 +1,25 @@
 ## Pangenome panel
-reference: reference.fa
+reference: '/path/to/reference.fasta'
 
 assemblies:
   asm1:
-    - asm1.hap1.fa
-    - asm1.hap2.fa
+    - 'asm1.hap1.fa
+    - 'asm1.hap2.fa'
   asm2:
-    - asm2.hap1.fa
-    - asm2.hap1.fa
+    - 'asm2.hap1.fa'
+    - 'asm2.hap1.fa'
   asm3:
-    - asm3.hap1.fa
-    - asm3.hap2.fa
+    - 'asm3.hap1.fa'
+    - 'asm3.hap2.fa'
+  asm4:
+    - 'asm4.hap1.fa'
+    - 'asm4.hap2.fa'
 trios:
   asm1:
     - asm2
     - asm3
 
-scripts: '<dir>'
-mscripts: '<dir>'
+scripts: '/path/to/PanGenie/scripts'
 outdir: 'pangenie_panel/'
 frac_missing: .15
 
@@ -30,14 +32,14 @@ samples:
  - sample1
  - sample2
 
-
 ## Variant comparison
 
 HiFi_samples:
   sample1: hifi_1.fq.gz
   sample2: hifi_2.fq.gz
 
-## Association testing
+
+## molecular QTL mapping
 
 covariates:
   eQTL:
