@@ -13,15 +13,23 @@ There are broadly three phases
   - Variant analysis (statistics, linkage disequibrium, SV overlap, etc.) 
   - Association mapping of e/sQTL
 
+
+An example of the input needed is given in the `config/example.yaml`, broadly requiring
+  - haplotype-resolved assemblies for pangenome panel creation
+  - small variants to supplement pangenome panel
+  - any HiFi samples to test SV completeness
+  - gene expression/splicing files and covariates for molecular QTL mapping
+
 Running with
 ```
-snakemake --configfile config/config.yaml
+snakemake --configfile config/example.yaml
 ```
-Will produce execute the following DAG
+Will execute the following DAG
 
 ![workflow](https://github.com/AnimalGenomicsETH/pangenome_molQTL/assets/29678761/bb0c73ca-fc31-4319-95e2-485da93f655a)
 
-which produces the major output files (e.g., accuracy comparison of PanGenie vs DeepVariant, SV overlap with Jasmine, conditional QTL analysis with QTLtools, etc.), which can then be independently analysed further.
+producing the major output files (e.g., accuracy comparison of PanGenie vs DeepVariant, SV overlap with Jasmine, conditional QTL analysis with QTLtools, etc.), which can then be independently analysed further.
+Many of these steps are computationally intensive, especially with many samples to genotype, and so effectively require some form of HPC.
 
 ### Citation
 
