@@ -21,7 +21,6 @@ configfile: "config.json"
 samples = config['assemblies'].keys()
 samples_parents = [s for s in samples if not s in config['trios']]
 scripts = config['scripts']
-mscripts = config['mscripts']
 outdir = config['outdir']
 chromosomes = list(map(str,range(1,30))) #[str(i) for i in range(1,23)] + [config['reference']['prefix'] + 'X', config['reference']['prefix'] + 'Y']
 frac_missing = config.get('frac_missing',0.2) # skip positions with more than this fraction of missing alleles
@@ -241,7 +240,7 @@ rule combine_haplotypes:
         mem_mb=10000,
         walltime = '24:00'
     shell:
-        'python3 {mscripts}/merge_vcfs.py combine_columns -samples {input.samples} -vcf {input.haps} > {output}'
+        'python3 {scripts}/merge_vcfs.py combine_columns -samples {input.samples} -vcf {input.haps} > {output}'
 
 
 #################################################################
@@ -287,7 +286,7 @@ rule check_mendelian_consistency:
         walltime = '24:00'
     shell:
         """
-        python3 {mscripts}/mendelian-consistency.py filter -vcf {input.vcf} -samples {input.samples} -ped {input.ped} -o {output.tsv} > {output.vcf}
+        python3 {scripts}/mendelian-consistency.py filter -vcf {input.vcf} -samples {input.samples} -ped {input.ped} -o {output.tsv} > {output.vcf}
         """
 
 rule merge_haplotypes:
@@ -304,7 +303,7 @@ rule merge_haplotypes:
         walltime = '4:00'
     shell:
         """
-        python3 {mscripts}/merge_vcfs.py merge -vcf {input.vcf} -r {input.reference} -ploidy 2 -chromosomes {wildcards.chr} -max_edit_distance 0.02 > {output.tmp}
+        python3 {scripts}/merge_vcfs.py merge -vcf {input.vcf} -r {input.reference} -ploidy 2 -chromosomes {wildcards.chr} -max_edit_distance 0.02 > {output.tmp}
         """
 
 #############################################
