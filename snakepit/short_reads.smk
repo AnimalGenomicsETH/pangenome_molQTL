@@ -1,6 +1,6 @@
 rule all:
     input:
-        'SR_SV/cohort.delly.forced.vcf.gz',
+        'SR_SV/SVs.vcf.gz',
         expand('SR_SV/{sample}_{caller}',caller=('insurveyor',),sample=config['HiFi'])
 
 rule picard_add_MQ:
@@ -41,7 +41,9 @@ rule delly_call_denovo:
     output:
         'SR_SV/{sample}.delly.denovo.bcf'
     envmodules:
-        'boost'
+        'gcc/9.3.0',
+        'boost/1.74.0',
+        'gsl/2.6'
     threads: 4
     resources:
         mem_mb = 4000
@@ -57,7 +59,9 @@ rule delly_merge:
     output:
         'SR_SV/cohort.delly.denovo.bcf'
     envmodules:
-        'boost'
+        'gcc/9.3.0',
+        'boost/1.74.0',
+        'gsl/2.6'
     threads: 4
     resources:
         mem_mb = 2500
@@ -73,7 +77,9 @@ rule delly_call_forced:
     output:
         'SR_SV/{sample}.delly.forced.vcf.gz'
     envmodules:
-        'boost'
+        'gcc/9.3.0',
+        'boost/1.74.0',
+        'gsl/2.6'
     threads: 4
     resources:
         mem_mb = 4000
@@ -103,7 +109,7 @@ rule delly_filter:
     envmodules:
         'gcc/9.3.0',
         'boost/1.74.0',
-        'gsl/2.7.1'
+        'gsl/2.6'
     threads: 1
     resources:
         mem_mb = 2500
