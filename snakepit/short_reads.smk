@@ -25,7 +25,7 @@ rule insurveyor:
         rules.picard_add_MQ.output
     output:
         _dir = directory('SR_SV/{sample}_insurveyor'),
-        #vcf = 'SR_SV/{sample}.insurveyor.vcf.gz'
+        vcf = 'SR_SV/{sample}_insurveyor/out.pass.vcf.gz'
     threads: 4
     resources:
         mem_mb = 5000
@@ -40,6 +40,8 @@ rule delly_call_denovo:
         '/cluster/work/pausch/inputs/bam/BTA_eQTL/{sample}.bam'
     output:
         'SR_SV/{sample}.delly.denovo.bcf'
+    envmodules:
+        'boost'
     threads: 4
     resources:
         mem_mb = 4000
@@ -54,6 +56,8 @@ rule delly_merge:
         expand(rules.delly_call_denovo.output,sample=config['HiFi'])
     output:
         'SR_SV/cohort.delly.denovo.bcf'
+    envmodules:
+        'boost'
     threads: 4
     resources:
         mem_mb = 2500
@@ -68,6 +72,8 @@ rule delly_call_forced:
         panel = rules.delly_merge.output
     output:
         'SR_SV/{sample}.delly.forced.vcf.gz'
+    envmodules:
+        'boost'
     threads: 4
     resources:
         mem_mb = 4000
@@ -80,11 +86,60 @@ rule delly_call_forced:
 
 rule bcftools_merge:
     input:
-        expand(rules.delly_call_forced.output,sample=config['HiFi'])
+        lambda wildcards: expand(rules.delly_call_forced.output,sample=config['HiFi']) if wildcards.caller == 'delly.forced' else (expand(rules.survtyper.output['vcf'],sample=config['HiFi']) if wildcards.caller == 'insurveyor.forced' else expand(rules.insurveyor.output['vcf'],sample=config['HiFi']))
     output:
-        'SR_SV/cohort.delly.forced.vcf.gz'
+        'SR_SV/cohort.{caller}.vcf.gz'
     shell:
         '''
         bcftools merge -m id -o {output} {input}
         tabix -fp vcf {output}
+        '''
+
+rule delly_filter:
+    input:
+        expand(rules.bcftools_merge.output,caller='delly.forced')
+    output:
+        'SR_SV/cohort.delly.filtered.vcf.gz'
+    envmodules:
+        'gcc/9.3.0',
+        'boost/1.74.0',
+        'gsl/2.7.1'
+    threads: 1
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+        /cluster/work/pausch/alex/software/delly/src/delly filter -f germline --altaf 0.01 --minsize 50 --pass -o $TMPDIR/sample.bcf {input}
+        bcftools view -o {output} $TMPDIR/sample.bcf
+        tabix -fp vcf {output}
+        '''
+
+rule survtyper:
+    input:
+        vcf = expand(rules.bcftools_merge.output,caller='insurveyor'),
+        bam = '/cluster/work/pausch/inputs/bam/BTA_eQTL/{sample}.bam'
+    output:
+        _dir = directory('SR_SV/{sample}_insurveyor_forced'),
+        vcf = 'SR_SV/{sample}_insurveyor_forced/genotyped.vcf.gz'
+    threads: 4
+    resources:
+        mem_mb = 5000
+    shell:
+        '''
+        python /cluster/work/pausch/alex/software/SurVTyper/survtyper.py --threads {threads} --samplename {wildcards.sample} {input.vcf} {input.bam} {output._dir} {config[reference]}
+        '''
+
+rule merge_callers:
+    input:
+        delly = rules.delly_filter.output,
+        insurveyor = expand(rules.bcftools_merge.output,caller='insurveyor.forced')
+    output:
+        'SR_SV/SVs.vcf.gz'
+    threads: 2
+    shell:
+        '''
+        bcftools view {input.delly} -e "SVTYPE=='INS'" -o $TMPDIR/deldel.vcf.gz
+        tabix -p vcf $TMPDIR/deldel.vcf.gz
+        bcftools concat -a --threads 2 -D -o {output} $TMPDIR/deldel.vcf.gz {input.insurveyor}
+        tabix -p vcf {output}
         '''
