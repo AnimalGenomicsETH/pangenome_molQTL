@@ -1,3 +1,5 @@
+from pathlib import PurePath
+
 rule all:
     input:
         'SR_SV/SVs.vcf.gz',
@@ -13,7 +15,8 @@ rule picard_add_MQ:
         'picard/3.1.1'
     threads: 1
     resources:
-        mem_mb = 7500
+        mem_mb = 15000,
+        walltime = '24h'
     shell:
         '''
         picard FixMateInformation -I {input} -O {output[0]}
@@ -28,11 +31,28 @@ rule insurveyor:
         vcf = 'SR_SV/{sample}_insurveyor/out.pass.vcf.gz'
     threads: 4
     resources:
-        mem_mb = 5000
+        mem_mb = 7000
     shell:
         '''
         mkdir -p {output._dir}
         python /cluster/work/pausch/alex/software/INSurVeyor/insurveyor.py --threads {threads} --samplename {wildcards.sample} {input[0]} {output._dir} {config[reference]}
+        '''
+
+rule SurVClusterer:
+    input:
+        expand(rules.insurveyor.output['vcf'],sample=config['HiFi'])
+    output:
+        multiext('SR_SV/cohort.insurveyor','.sv','.vcf.gz','.vcf.gz.tbi')
+    params:
+        prefix = lambda wildcards, output: PurePath(output[0]).with_suffix('')
+    threads: 6
+    resources:
+        mem_mb = 4000
+    shell:
+        '''
+        awk '$1=="-" {{print $2, "SR_SV/"$2"_insurveyor/out.pass.vcf.gz"}}' config/SR_SV.yaml > $TMPDIR/samples.fofn
+        /cluster/work/pausch/alex/software/SurVClusterer/clusterer $TMPDIR/samples.fofn {config[reference]} -t {threads} --min-overlap-precise 0.95 --max-dist-precise 25 --overlap-for-ins -o {params.prefix}
+        tabix -fp vcf {output[1]}
         '''
 
 rule delly_call_denovo:
@@ -50,7 +70,7 @@ rule delly_call_denovo:
     shell:
         '''
         /cluster/work/pausch/alex/software/delly/src/delly call -g {config[reference]} -o {output} {input}
-        bcftools index {output}
+        #bcftools index {output}
         '''
 
 rule delly_merge:
@@ -95,6 +115,8 @@ rule bcftools_merge:
         lambda wildcards: expand(rules.delly_call_forced.output,sample=config['HiFi']) if wildcards.caller == 'delly.forced' else (expand(rules.survtyper.output['vcf'],sample=config['HiFi']) if wildcards.caller == 'insurveyor.forced' else expand(rules.insurveyor.output['vcf'],sample=config['HiFi']))
     output:
         'SR_SV/cohort.{caller}.vcf.gz'
+    resources:
+        mem_mb = 10000
     shell:
         '''
         bcftools merge -m id -o {output} {input}
@@ -120,16 +142,18 @@ rule delly_filter:
         tabix -fp vcf {output}
         '''
 
+#awk '$1=="-" {print $2, "SR_SV/"$2"_insurveyor/out.pass.vcf.gz"}' ../config/SR_SV.yaml > ../insurveyor.fofn
 rule survtyper:
     input:
-        vcf = expand(rules.bcftools_merge.output,caller='insurveyor'),
+        vcf = rules.SurVClusterer.output[1],
         bam = '/cluster/work/pausch/inputs/bam/BTA_eQTL/{sample}.bam'
     output:
         _dir = directory('SR_SV/{sample}_insurveyor_forced'),
         vcf = 'SR_SV/{sample}_insurveyor_forced/genotyped.vcf.gz'
-    threads: 4
+    threads: 6
     resources:
-        mem_mb = 5000
+        mem_mb = 8000,
+        walltime = '4h'
     shell:
         '''
         python /cluster/work/pausch/alex/software/SurVTyper/survtyper.py --threads {threads} --samplename {wildcards.sample} {input.vcf} {input.bam} {output._dir} {config[reference]}
