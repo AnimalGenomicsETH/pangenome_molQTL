@@ -170,6 +170,8 @@ rule merge_callers:
         '''
         bcftools view {input.delly} -e "SVTYPE=='INS'" -o $TMPDIR/deldel.vcf.gz
         tabix -p vcf $TMPDIR/deldel.vcf.gz
-        bcftools concat -a --threads 2 -D -o {output} $TMPDIR/deldel.vcf.gz {input.insurveyor}
+        bcftools concat -a --threads 2 -D -o $TMPDIR/concat.vcf.gz $TMPDIR/deldel.vcf.gz {input.insurveyor}
+        tabix -p vcf $TMPDIR/concat.vcf.gz
+        bcftools view -e INFO/INCOMPLETE_ASSEMBLY!=0 -o {output} $TMPDIR/concat.vcf.gz 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29
         tabix -p vcf {output}
         '''
